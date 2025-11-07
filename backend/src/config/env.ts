@@ -19,13 +19,15 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
 
-  // SMS (Twilio)
+  // SMS (MSG91)
   sms: {
-    provider: process.env.SMS_PROVIDER || 'twilio',
-    twilio: {
-      accountSid: process.env.TWILIO_ACCOUNT_SID!,
-      authToken: process.env.TWILIO_AUTH_TOKEN!,
-      phoneNumber: process.env.TWILIO_PHONE_NUMBER!,
+    provider: process.env.SMS_PROVIDER || 'msg91',
+    msg91: {
+      authKey: process.env.MSG91_AUTH_KEY!,
+      senderId: process.env.MSG91_SENDER_ID || 'CNCEXP',
+      route: process.env.MSG91_ROUTE || '4', // 4 = Transactional
+      templateId: process.env.MSG91_TEMPLATE_ID,
+      otpTemplateId: process.env.MSG91_OTP_TEMPLATE_ID,
     },
   },
 
