@@ -1,0 +1,629 @@
+import { Request, Response } from 'express';
+import prisma from '../config/database';
+import { generateOTP, getWorkerVisitOTPExpiry, isOTPExpired } from '../utils/otp';
+import { sendWorkerCountOTPToClient, sendWorkerCountOTPToAdmin } from '../services/sms.service';
+import { format } from 'date-fns';
+
+/**
+ * Create worker visit and send dual OTP (Engineer only)
+ */
+export const createVisit = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clientId, visitDate } = req.body;
+    const userId = req.user?.userId;
+
+    if (!clientId || !visitDate) {
+      res.status(400).json({ error: 'Client and visit date are required' });
+      return;
+    }
+
+    // Verify client exists and is active
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, isActive: true },
+    });
+
+    if (!client) {
+      res.status(404).json({ error: 'Client not found or inactive' });
+      return;
+    }
+
+    // Get engineer details
+    const engineer = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!engineer) {
+      res.status(404).json({ error: 'Engineer not found' });
+      return;
+    }
+
+    // Generate OTP (valid for 24 hours)
+    const otp = generateOTP();
+    const otpExpiry = getWorkerVisitOTPExpiry();
+
+    // Create visit
+    const visit = await prisma.workerVisit.create({
+      data: {
+        engineerId: userId!,
+        clientId,
+        visitDate: new Date(visitDate),
+        otp,
+        otpExpiresAt: otpExpiry,
+        status: 'PENDING',
+      },
+      include: {
+        client: true,
+        engineer: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    // Get admin phone from settings
+    const adminPhoneSetting = await prisma.settings.findUnique({
+      where: { key: 'admin_phone' },
+    });
+
+    const adminPhone = adminPhoneSetting?.value || process.env.ADMIN_PHONE || '';
+
+    // Format date for SMS
+    const dateStr = format(new Date(visitDate), 'MMM dd, yyyy');
+
+    // Send OTP to client's primary contact
+    await sendWorkerCountOTPToClient(
+      client.primaryContact,
+      otp,
+      client.name,
+      dateStr
+    );
+
+    // Send OTP to admin
+    if (adminPhone) {
+      await sendWorkerCountOTPToAdmin(
+        adminPhone,
+        otp,
+        engineer.name,
+        client.name,
+        dateStr
+      );
+    }
+
+    res.status(201).json({
+      visit,
+      message: 'Visit created and OTP sent to client and admin',
+      otpSentTo: {
+        client: client.primaryContact,
+        admin: adminPhone || 'Not configured',
+      },
+      otpExpiresAt: otpExpiry,
+    });
+  } catch (error) {
+    console.error('Create visit error:', error);
+    res.status(500).json({ error: 'Failed to create visit' });
+  }
+};
+
+/**
+ * Submit worker count with OTP verification (Engineer only)
+ */
+export const submitWorkerCount = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { otp, workerCount, remarks } = req.body;
+    const userId = req.user?.userId;
+
+    if (!otp || !workerCount) {
+      res.status(400).json({ error: 'OTP and worker count are required' });
+      return;
+    }
+
+    if (workerCount <= 0) {
+      res.status(400).json({ error: 'Worker count must be positive' });
+      return;
+    }
+
+    // Get visit
+    const visit = await prisma.workerVisit.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!visit) {
+      res.status(404).json({ error: 'Visit not found' });
+      return;
+    }
+
+    // Verify engineer owns this visit
+    if (visit.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check if already completed
+    if (visit.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Worker count already submitted for this visit' });
+      return;
+    }
+
+    // Check if OTP expired (24 hours)
+    if (isOTPExpired(visit.otpExpiresAt)) {
+      res.status(400).json({ error: 'OTP has expired. Please create a new visit.' });
+      return;
+    }
+
+    // Verify OTP (no attempt limit for worker visits)
+    if (visit.otp !== otp) {
+      res.status(400).json({ error: 'Invalid OTP' });
+      return;
+    }
+
+    // Update visit with worker count
+    const updatedVisit = await prisma.workerVisit.update({
+      where: { id },
+      data: {
+        workerCount: Number(workerCount),
+        remarks,
+        status: 'COMPLETED',
+        submittedAt: new Date(),
+      },
+      include: {
+        client: {
+          select: {
+            name: true,
+          },
+        },
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      message: 'Worker count submitted successfully',
+      visit: updatedVisit,
+    });
+  } catch (error) {
+    console.error('Submit worker count error:', error);
+    res.status(500).json({ error: 'Failed to submit worker count' });
+  }
+};
+
+/**
+ * Get pending visits for engineer
+ */
+export const getPendingVisits = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+
+    const visits = await prisma.workerVisit.findMany({
+      where: {
+        engineerId: userId,
+        status: 'PENDING',
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+          },
+        },
+      },
+      orderBy: {
+        visitDate: 'desc',
+      },
+    });
+
+    res.json(visits);
+  } catch (error) {
+    console.error('Get pending visits error:', error);
+    res.status(500).json({ error: 'Failed to fetch pending visits' });
+  }
+};
+
+/**
+ * Get completed visits for engineer
+ */
+export const getCompletedVisits = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 20, dateFrom, dateTo, clientId } = req.query;
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+
+    const where: any = {
+      status: 'COMPLETED',
+    };
+
+    // Engineers see only their own visits
+    if (userRole === 'ENGINEER') {
+      where.engineerId = userId;
+    }
+
+    if (dateFrom || dateTo) {
+      where.visitDate = {};
+      if (dateFrom) {
+        where.visitDate.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.visitDate.lte = new Date(dateTo as string);
+      }
+    }
+
+    if (clientId) {
+      where.clientId = clientId as string;
+    }
+
+    const [visits, total] = await Promise.all([
+      prisma.workerVisit.findMany({
+        where,
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          engineer: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
+        orderBy: {
+          visitDate: 'desc',
+        },
+      }),
+      prisma.workerVisit.count({ where }),
+    ]);
+
+    res.json({
+      data: visits,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get completed visits error:', error);
+    res.status(500).json({ error: 'Failed to fetch completed visits' });
+  }
+};
+
+/**
+ * Get all visits (Admin only)
+ */
+export const getAllVisits = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { page = 1, limit = 20, status, engineerId, clientId, dateFrom, dateTo } = req.query;
+
+    const where: any = {};
+
+    if (status) {
+      where.status = status as string;
+    }
+
+    if (engineerId) {
+      where.engineerId = engineerId as string;
+    }
+
+    if (clientId) {
+      where.clientId = clientId as string;
+    }
+
+    if (dateFrom || dateTo) {
+      where.visitDate = {};
+      if (dateFrom) {
+        where.visitDate.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.visitDate.lte = new Date(dateTo as string);
+      }
+    }
+
+    const [visits, total] = await Promise.all([
+      prisma.workerVisit.findMany({
+        where,
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          engineer: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        skip: (Number(page) - 1) * Number(limit),
+        take: Number(limit),
+        orderBy: {
+          visitDate: 'desc',
+        },
+      }),
+      prisma.workerVisit.count({ where }),
+    ]);
+
+    res.json({
+      data: visits,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error) {
+    console.error('Get all visits error:', error);
+    res.status(500).json({ error: 'Failed to fetch visits' });
+  }
+};
+
+/**
+ * Engineer visit summary report (Admin only)
+ */
+export const getEngineerSummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { engineerId, dateFrom, dateTo } = req.query;
+
+    const where: any = {
+      status: 'COMPLETED',
+    };
+
+    if (engineerId) {
+      where.engineerId = engineerId as string;
+    }
+
+    if (dateFrom || dateTo) {
+      where.visitDate = {};
+      if (dateFrom) {
+        where.visitDate.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.visitDate.lte = new Date(dateTo as string);
+      }
+    }
+
+    const visits = await prisma.workerVisit.findMany({
+      where,
+      include: {
+        engineer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        client: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        visitDate: 'desc',
+      },
+    });
+
+    // Group by engineer and client
+    const summary: Record<string, any> = {};
+
+    visits.forEach((visit) => {
+      const key = `${visit.engineerId}-${visit.clientId}`;
+
+      if (!summary[key]) {
+        summary[key] = {
+          engineerId: visit.engineerId,
+          engineerName: visit.engineer.name,
+          clientId: visit.clientId,
+          clientName: visit.client.name,
+          totalVisits: 0,
+          totalWorkers: 0,
+          avgWorkersPerVisit: 0,
+          lastVisitDate: visit.visitDate,
+        };
+      }
+
+      summary[key].totalVisits += 1;
+      summary[key].totalWorkers += visit.workerCount || 0;
+
+      if (visit.visitDate > summary[key].lastVisitDate) {
+        summary[key].lastVisitDate = visit.visitDate;
+      }
+    });
+
+    // Calculate averages
+    const report = Object.values(summary).map((item: any) => ({
+      ...item,
+      avgWorkersPerVisit: Math.round(item.totalWorkers / item.totalVisits),
+    }));
+
+    res.json(report);
+  } catch (error) {
+    console.error('Get engineer summary error:', error);
+    res.status(500).json({ error: 'Failed to generate engineer summary' });
+  }
+};
+
+/**
+ * Site-wise worker count report (Admin only)
+ */
+export const getSiteWiseSummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { clientId, dateFrom, dateTo } = req.query;
+
+    const where: any = {
+      status: 'COMPLETED',
+    };
+
+    if (clientId) {
+      where.clientId = clientId as string;
+    }
+
+    if (dateFrom || dateTo) {
+      where.visitDate = {};
+      if (dateFrom) {
+        where.visitDate.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.visitDate.lte = new Date(dateTo as string);
+      }
+    }
+
+    const visits = await prisma.workerVisit.findMany({
+      where,
+      include: {
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+        client: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        visitDate: 'desc',
+      },
+    });
+
+    // Group by client
+    const summary: Record<string, any> = {};
+
+    visits.forEach((visit) => {
+      const clientId = visit.clientId;
+
+      if (!summary[clientId]) {
+        summary[clientId] = {
+          clientId,
+          clientName: visit.client.name,
+          totalWorkingDays: 0,
+          totalWorkerDays: 0,
+          avgWorkersPerDay: 0,
+          visits: [],
+        };
+      }
+
+      summary[clientId].totalWorkingDays += 1;
+      summary[clientId].totalWorkerDays += visit.workerCount || 0;
+      summary[clientId].visits.push({
+        date: visit.visitDate,
+        engineerName: visit.engineer.name,
+        workers: visit.workerCount,
+        remarks: visit.remarks,
+        submittedAt: visit.submittedAt,
+      });
+    });
+
+    // Calculate averages and payment
+    const report = Object.values(summary).map((item: any) => ({
+      clientId: item.clientId,
+      clientName: item.clientName,
+      totalWorkingDays: item.totalWorkingDays,
+      totalWorkerDays: item.totalWorkerDays,
+      avgWorkersPerDay: Math.round(item.totalWorkerDays / item.totalWorkingDays),
+      visits: item.visits,
+    }));
+
+    res.json(report);
+  } catch (error) {
+    console.error('Get site-wise summary error:', error);
+    res.status(500).json({ error: 'Failed to generate site-wise summary' });
+  }
+};
+
+/**
+ * Date-wise worker analysis (Admin only)
+ */
+export const getDateWiseAnalysis = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { month, year } = req.query;
+
+    if (!month || !year) {
+      res.status(400).json({ error: 'Month and year are required' });
+      return;
+    }
+
+    const startDate = new Date(Number(year), Number(month) - 1, 1);
+    const endDate = new Date(Number(year), Number(month), 0);
+
+    const visits = await prisma.workerVisit.findMany({
+      where: {
+        status: 'COMPLETED',
+        visitDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+        client: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        visitDate: 'asc',
+      },
+    });
+
+    // Group by date
+    const dateWise: Record<string, any> = {};
+
+    visits.forEach((visit) => {
+      const dateKey = format(visit.visitDate, 'yyyy-MM-dd');
+
+      if (!dateWise[dateKey]) {
+        dateWise[dateKey] = {
+          date: visit.visitDate,
+          sites: [],
+          totalSites: 0,
+          verifiedSites: 0,
+          totalWorkers: 0,
+        };
+      }
+
+      dateWise[dateKey].sites.push({
+        clientName: visit.client.name,
+        engineerName: visit.engineer.name,
+        workers: visit.workerCount,
+        status: 'Completed',
+      });
+
+      dateWise[dateKey].totalSites += 1;
+      dateWise[dateKey].verifiedSites += 1;
+      dateWise[dateKey].totalWorkers += visit.workerCount || 0;
+    });
+
+    res.json(Object.values(dateWise));
+  } catch (error) {
+    console.error('Get date-wise analysis error:', error);
+    res.status(500).json({ error: 'Failed to generate date-wise analysis' });
+  }
+};
