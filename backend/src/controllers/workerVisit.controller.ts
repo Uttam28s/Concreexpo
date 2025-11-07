@@ -9,7 +9,7 @@ import { format } from 'date-fns';
  */
 export const createVisit = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clientId, visitDate } = req.body;
+    const { clientId, visitDate, siteAddress } = req.body;
     const userId = req.user?.userId;
 
     if (!clientId || !visitDate) {
@@ -47,8 +47,10 @@ export const createVisit = async (req: Request, res: Response): Promise<void> =>
         engineerId: userId!,
         clientId,
         visitDate: new Date(visitDate),
+        siteAddress,
         otp,
         otpExpiresAt: otpExpiry,
+        otpSentAt: new Date(),
         status: 'PENDING',
       },
       include: {
@@ -173,8 +175,8 @@ export const submitWorkerCount = async (req: Request, res: Response): Promise<vo
       data: {
         workerCount: Number(workerCount),
         remarks,
-        status: 'COMPLETED',
-        submittedAt: new Date(),
+        status: 'OTP_VERIFIED',
+        verifiedAt: new Date(),
       },
       include: {
         client: {
@@ -243,7 +245,7 @@ export const getCompletedVisits = async (req: Request, res: Response): Promise<v
     const userRole = req.user?.role;
 
     const where: any = {
-      status: 'COMPLETED',
+      status: { in: ['OTP_VERIFIED', 'COMPLETED'] },
     };
 
     // Engineers see only their own visits
@@ -297,7 +299,7 @@ export const getCompletedVisits = async (req: Request, res: Response): Promise<v
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -369,7 +371,7 @@ export const getAllVisits = async (req: Request, res: Response): Promise<void> =
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -386,7 +388,7 @@ export const getEngineerSummary = async (req: Request, res: Response): Promise<v
     const { engineerId, dateFrom, dateTo } = req.query;
 
     const where: any = {
-      status: 'COMPLETED',
+      status: { in: ['OTP_VERIFIED', 'COMPLETED'] },
     };
 
     if (engineerId) {
@@ -472,7 +474,7 @@ export const getSiteWiseSummary = async (req: Request, res: Response): Promise<v
     const { clientId, dateFrom, dateTo } = req.query;
 
     const where: any = {
-      status: 'COMPLETED',
+      status: { in: ['OTP_VERIFIED', 'COMPLETED'] },
     };
 
     if (clientId) {
@@ -532,7 +534,7 @@ export const getSiteWiseSummary = async (req: Request, res: Response): Promise<v
         engineerName: visit.engineer.name,
         workers: visit.workerCount,
         remarks: visit.remarks,
-        submittedAt: visit.submittedAt,
+        verifiedAt: visit.verifiedAt,
       });
     });
 
@@ -570,7 +572,7 @@ export const getDateWiseAnalysis = async (req: Request, res: Response): Promise<
 
     const visits = await prisma.workerVisit.findMany({
       where: {
-        status: 'COMPLETED',
+        status: { in: ['OTP_VERIFIED', 'COMPLETED'] },
         visitDate: {
           gte: startDate,
           lte: endDate,

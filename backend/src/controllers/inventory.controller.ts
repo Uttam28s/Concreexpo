@@ -6,9 +6,8 @@ import prisma from '../config/database';
  */
 export const stockIn = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { materialId, quantity, transactionDate, remarks } = req.body;
+    const { materialId, quantity, transactionDate, remarks, appointmentId } = req.body;
     const userId = req.user?.userId;
-    const userName = req.user?.email; // You might want to get name from user
 
     if (!materialId || !quantity || !transactionDate) {
       res.status(400).json({ error: 'Material, quantity, and date are required' });
@@ -30,11 +29,17 @@ export const stockIn = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Get user details for entryByName
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
+    // Verify appointment exists if provided
+    if (appointmentId) {
+      const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+      });
+
+      if (!appointment) {
+        res.status(404).json({ error: 'Appointment not found' });
+        return;
+      }
+    }
 
     // Create transaction
     const transaction = await prisma.inventoryTransaction.create({
@@ -44,8 +49,8 @@ export const stockIn = async (req: Request, res: Response): Promise<void> => {
         quantity: Number(quantity),
         transactionDate: new Date(transactionDate),
         remarks,
-        entryBy: userId!,
-        entryByName: user?.name || 'Unknown',
+        createdBy: userId!,
+        appointmentId,
       },
       include: {
         material: true,
@@ -64,11 +69,11 @@ export const stockIn = async (req: Request, res: Response): Promise<void> => {
  */
 export const stockOut = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { materialId, clientId, quantity, transactionDate, remarks } = req.body;
+    const { materialId, clientId, siteAddress, quantity, transactionDate, remarks, appointmentId } = req.body;
     const userId = req.user?.userId;
 
-    if (!materialId || !clientId || !quantity || !transactionDate) {
-      res.status(400).json({ error: 'Material, client, quantity, and date are required' });
+    if (!materialId || !quantity || !transactionDate) {
+      res.status(400).json({ error: 'Material, quantity, and date are required' });
       return;
     }
 
@@ -87,14 +92,28 @@ export const stockOut = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verify client exists and is active
-    const client = await prisma.client.findFirst({
-      where: { id: clientId, isActive: true },
-    });
+    // Verify client exists and is active (if provided)
+    if (clientId) {
+      const client = await prisma.client.findFirst({
+        where: { id: clientId, isActive: true },
+      });
 
-    if (!client) {
-      res.status(404).json({ error: 'Client not found or inactive' });
-      return;
+      if (!client) {
+        res.status(404).json({ error: 'Client not found or inactive' });
+        return;
+      }
+    }
+
+    // Verify appointment exists if provided
+    if (appointmentId) {
+      const appointment = await prisma.appointment.findUnique({
+        where: { id: appointmentId },
+      });
+
+      if (!appointment) {
+        res.status(404).json({ error: 'Appointment not found' });
+        return;
+      }
     }
 
     // Calculate current stock
@@ -115,23 +134,18 @@ export const stockOut = async (req: Request, res: Response): Promise<void> => {
       ? `Warning: This exceeds available stock by ${quantity - currentStock} buckets`
       : null;
 
-    // Get user details
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
-
     // Create transaction
     const transaction = await prisma.inventoryTransaction.create({
       data: {
         materialId,
         clientId,
+        siteAddress,
         transactionType: 'STOCK_OUT',
         quantity: Number(quantity),
         transactionDate: new Date(transactionDate),
         remarks,
-        entryBy: userId!,
-        entryByName: user?.name || 'Unknown',
+        createdBy: userId!,
+        appointmentId,
       },
       include: {
         material: true,
@@ -271,7 +285,7 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {

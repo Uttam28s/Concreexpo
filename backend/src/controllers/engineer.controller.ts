@@ -15,7 +15,7 @@ export const getEngineers = async (req: Request, res: Response): Promise<void> =
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
         { email: { contains: search as string, mode: 'insensitive' } },
-        { phone: { contains: search as string } },
+        { mobileNumber: { contains: search as string } },
       ];
     }
 
@@ -30,8 +30,9 @@ export const getEngineers = async (req: Request, res: Response): Promise<void> =
           id: true,
           name: true,
           email: true,
-          phone: true,
+          mobileNumber: true,
           isActive: true,
+          deletedAt: true,
           createdAt: true,
           updatedAt: true,
           _count: {
@@ -56,7 +57,7 @@ export const getEngineers = async (req: Request, res: Response): Promise<void> =
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -78,8 +79,9 @@ export const getEngineer = async (req: Request, res: Response): Promise<void> =>
         id: true,
         name: true,
         email: true,
-        phone: true,
+        mobileNumber: true,
         isActive: true,
+        deletedAt: true,
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -109,10 +111,10 @@ export const getEngineer = async (req: Request, res: Response): Promise<void> =>
  */
 export const createEngineer = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, mobileNumber, password } = req.body;
 
     // Validate required fields
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !mobileNumber || !password) {
       res.status(400).json({ error: 'All fields are required' });
       return;
     }
@@ -125,20 +127,20 @@ export const createEngineer = async (req: Request, res: Response): Promise<void>
     }
 
     // Validate phone number
-    if (!/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
-      res.status(400).json({ error: 'Invalid phone number' });
+    if (!/^\d{10}$/.test(mobileNumber.replace(/\D/g, ''))) {
+      res.status(400).json({ error: 'Invalid mobile number' });
       return;
     }
 
-    // Check for existing email or phone
+    // Check for existing email or mobileNumber
     const existing = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone }],
+        OR: [{ email }, { mobileNumber }],
       },
     });
 
     if (existing) {
-      res.status(409).json({ error: 'Email or phone already exists' });
+      res.status(409).json({ error: 'Email or mobile number already exists' });
       return;
     }
 
@@ -150,7 +152,7 @@ export const createEngineer = async (req: Request, res: Response): Promise<void>
       data: {
         name,
         email,
-        phone,
+        mobileNumber,
         password: hashedPassword,
         role: 'ENGINEER',
       },
@@ -158,7 +160,7 @@ export const createEngineer = async (req: Request, res: Response): Promise<void>
         id: true,
         name: true,
         email: true,
-        phone: true,
+        mobileNumber: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -178,7 +180,7 @@ export const createEngineer = async (req: Request, res: Response): Promise<void>
 export const updateEngineer = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, phone, isActive } = req.body;
+    const { name, email, mobileNumber, isActive } = req.body;
 
     // Check if engineer exists
     const existing = await prisma.user.findFirst({
@@ -190,14 +192,14 @@ export const updateEngineer = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Validate phone if provided
-    if (phone && !/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
-      res.status(400).json({ error: 'Invalid phone number' });
+    // Validate mobileNumber if provided
+    if (mobileNumber && !/^\d{10}$/.test(mobileNumber.replace(/\D/g, ''))) {
+      res.status(400).json({ error: 'Invalid mobile number' });
       return;
     }
 
-    // Check for duplicate email/phone
-    if (email || phone) {
+    // Check for duplicate email/mobileNumber
+    if (email || mobileNumber) {
       const duplicate = await prisma.user.findFirst({
         where: {
           AND: [
@@ -205,7 +207,7 @@ export const updateEngineer = async (req: Request, res: Response): Promise<void>
             {
               OR: [
                 email ? { email } : {},
-                phone ? { phone } : {},
+                mobileNumber ? { mobileNumber } : {},
               ],
             },
           ],
@@ -213,19 +215,19 @@ export const updateEngineer = async (req: Request, res: Response): Promise<void>
       });
 
       if (duplicate) {
-        res.status(409).json({ error: 'Email or phone already exists' });
+        res.status(409).json({ error: 'Email or mobile number already exists' });
         return;
       }
     }
 
     const engineer = await prisma.user.update({
       where: { id },
-      data: { name, email, phone, isActive },
+      data: { name, email, mobileNumber, isActive },
       select: {
         id: true,
         name: true,
         email: true,
-        phone: true,
+        mobileNumber: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -264,10 +266,10 @@ export const deleteEngineer = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Always deactivate (preserve history)
+    // Always deactivate and soft delete (preserve history)
     await prisma.user.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: false, deletedAt: new Date() },
     });
 
     res.json({ message: 'Engineer deactivated successfully' });

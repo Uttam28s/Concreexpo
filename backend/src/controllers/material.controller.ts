@@ -72,7 +72,7 @@ export const getMaterials = async (req: Request, res: Response): Promise<void> =
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -219,11 +219,11 @@ export const deleteMaterial = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // If material has transactions, deactivate. Otherwise, delete
+    // If material has transactions, deactivate and soft delete. Otherwise, delete
     if (material._count.inventoryTransactions > 0) {
       await prisma.material.update({
         where: { id },
-        data: { isActive: false },
+        data: { isActive: false, deletedAt: new Date() },
       });
       res.json({ message: 'Material deactivated successfully' });
     } else {

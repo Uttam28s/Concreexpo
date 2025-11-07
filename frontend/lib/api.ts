@@ -69,7 +69,7 @@ export const clientApi = {
   create: (data: any) => api.post('/clients', data),
   update: (id: string, data: any) => api.put(`/clients/${id}`, data),
   delete: (id: string) => api.delete(`/clients/${id}`),
-  getTypes: () => api.get('/clients/types'),
+  getTypes: () => api.get('/clients/types/all'),
   createType: (name: string) => api.post('/clients/types', { name }),
 };
 
@@ -100,7 +100,7 @@ export const appointmentApi = {
   sendOtp: (id: string) => api.post(`/appointments/${id}/send-otp`),
   verifyOtp: (id: string, otp: string) => api.post(`/appointments/${id}/verify-otp`, { otp }),
   submitFeedback: (id: string, feedback: string) => api.post(`/appointments/${id}/feedback`, { feedback }),
-  getDashboard: () => api.get('/appointments/engineer/dashboard'),
+  getDashboard: () => api.get('/appointments/dashboard'),
   getReports: (params?: any) => api.get('/appointments/reports', { params }),
   export: (params?: any) => api.get('/appointments/export', { params, responseType: 'blob' }),
 };

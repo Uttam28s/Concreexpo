@@ -34,6 +34,7 @@ enum TransactionType {
 
 enum VisitStatus {
   PENDING
+  OTP_VERIFIED
   COMPLETED
 }
 
@@ -46,11 +47,12 @@ model User {
   email         String    @unique
   password      String
   name          String
-  phone         String    @unique
+  mobileNumber  String    @unique @map("phone")
   role          UserRole
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   // Relations
   appointmentsAsEngineer  Appointment[]
@@ -58,7 +60,7 @@ model User {
   workerVisits            WorkerVisit[]
 
   @@index([email])
-  @@index([phone])
+  @@index([mobileNumber])
   @@map("users")
 }
 
@@ -76,17 +78,17 @@ model ClientType {
 model Client {
   id                    String      @id @default(cuid())
   name                  String
-  address               String
+  address               String?
   primaryContact        String
-  clientTypeId          String
-  alternateContactName  String?
-  alternateContactPhone String?
+  secondaryContact      String?
+  clientTypeId          String?
   isActive              Boolean     @default(true)
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
+  deletedAt             DateTime?
 
   // Relations
-  clientType            ClientType  @relation(fields: [clientTypeId], references: [id])
+  clientType            ClientType? @relation(fields: [clientTypeId], references: [id])
   appointments          Appointment[]
   inventoryTransactions InventoryTransaction[]
   workerVisits          WorkerVisit[]
@@ -104,6 +106,7 @@ model Material {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
   inventoryTransactions InventoryTransaction[]
@@ -116,14 +119,15 @@ model Appointment {
   id              String            @id @default(cuid())
   engineerId      String
   clientId        String
-  attendeeName    String
-  appointmentDate DateTime
-  location        String
+  visitDate       DateTime          @map("appointmentDate")
+  purpose         String?
+  siteAddress     String?
   otpMobileNumber String?
   status          AppointmentStatus @default(SCHEDULED)
   otp             String?
   otpExpiresAt    DateTime?
   otpSentAt       DateTime?
+  otpAttempts     Int               @default(0)
   verifiedAt      DateTime?
   feedback        String?
   createdAt       DateTime          @default(now())
@@ -132,10 +136,11 @@ model Appointment {
   // Relations
   engineer        User              @relation(fields: [engineerId], references: [id])
   client          Client            @relation(fields: [clientId], references: [id])
+  inventoryTransactions InventoryTransaction[]
 
   @@index([engineerId])
   @@index([clientId])
-  @@index([appointmentDate])
+  @@index([visitDate])
   @@index([status])
   @@map("appointments")
 }
@@ -145,20 +150,24 @@ model InventoryTransaction {
   materialId      String
   transactionType TransactionType
   quantity        Int
+  siteAddress     String?
   clientId        String?
+  appointmentId   String?
   remarks         String?
-  entryBy         String
-  entryByName     String
+  createdBy       String          @map("entryBy")
   transactionDate DateTime
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   // Relations
-  material        Material         @relation(fields: [materialId], references: [id])
-  client          Client?          @relation(fields: [clientId], references: [id])
-  user            User             @relation(fields: [entryBy], references: [id])
+  material        Material        @relation(fields: [materialId], references: [id])
+  client          Client?         @relation(fields: [clientId], references: [id])
+  appointment     Appointment?    @relation(fields: [appointmentId], references: [id])
+  createdByUser   User            @relation(fields: [createdBy], references: [id])
 
   @@index([materialId])
   @@index([clientId])
+  @@index([appointmentId])
   @@index([transactionDate])
   @@index([transactionType])
   @@map("inventory_transactions")
@@ -169,12 +178,14 @@ model WorkerVisit {
   engineerId    String
   clientId      String
   visitDate     DateTime
-  otp           String
-  otpExpiresAt  DateTime
+  siteAddress   String?
+  otp           String?
+  otpSentAt     DateTime?
+  otpExpiresAt  DateTime?
+  status        VisitStatus @default(PENDING)
+  verifiedAt    DateTime?
   workerCount   Int?
   remarks       String?
-  status        VisitStatus @default(PENDING)
-  submittedAt   DateTime?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

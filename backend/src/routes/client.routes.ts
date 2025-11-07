@@ -22,8 +22,8 @@ router.post('/', adminOnly, createClient);
 router.put('/:id', adminOnly, updateClient);
 router.delete('/:id', adminOnly, deleteClient);
 
-// Client type routes
-router.get('/types/all', getClientTypes);
+// Client type routes (order matters - /types must come before /:id)
+router.get('/types', getClientTypes);
 router.post('/types', adminOnly, createClientType);
 
 export default router;

@@ -38,12 +38,12 @@ export const getAppointments = async (req: Request, res: Response): Promise<void
     }
 
     if (dateFrom || dateTo) {
-      where.appointmentDate = {};
+      where.visitDate = {};
       if (dateFrom) {
-        where.appointmentDate.gte = new Date(dateFrom as string);
+        where.visitDate.gte = new Date(dateFrom as string);
       }
       if (dateTo) {
-        where.appointmentDate.lte = new Date(dateTo as string);
+        where.visitDate.lte = new Date(dateTo as string);
       }
     }
 
@@ -56,7 +56,7 @@ export const getAppointments = async (req: Request, res: Response): Promise<void
               id: true,
               name: true,
               email: true,
-              phone: true,
+              mobileNumber: true,
             },
           },
           client: {
@@ -71,7 +71,7 @@ export const getAppointments = async (req: Request, res: Response): Promise<void
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
         orderBy: {
-          appointmentDate: 'desc',
+          visitDate: 'desc',
         },
       }),
       prisma.appointment.count({ where }),
@@ -83,7 +83,7 @@ export const getAppointments = async (req: Request, res: Response): Promise<void
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -117,8 +117,7 @@ export const getAppointment = async (req: Request, res: Response): Promise<void>
             id: true,
             name: true,
             primaryContact: true,
-            alternateContactName: true,
-            alternateContactPhone: true,
+            secondaryContact: true,
             address: true,
           },
         },
@@ -151,15 +150,15 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
     const {
       engineerId,
       clientId,
-      attendeeName,
-      appointmentDate,
-      location,
+      purpose,
+      visitDate,
+      siteAddress,
       otpMobileNumber,
     } = req.body;
 
-    // Validate required fields
-    if (!engineerId || !clientId || !attendeeName || !appointmentDate || !location) {
-      res.status(400).json({ error: 'All required fields must be provided' });
+    // Validate required fields (only engineerId, clientId, and visitDate are required)
+    if (!engineerId || !clientId || !visitDate) {
+      res.status(400).json({ error: 'Engineer, client, and visit date are required' });
       return;
     }
 
@@ -184,9 +183,14 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Validate appointment date is in future
-    if (new Date(appointmentDate) < new Date()) {
-      res.status(400).json({ error: 'Appointment date must be in the future' });
+    // Validate visit date is not in the past (allow same day)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const visitDateObj = new Date(visitDate);
+    visitDateObj.setHours(0, 0, 0, 0);
+
+    if (visitDateObj < today) {
+      res.status(400).json({ error: 'Visit date cannot be in the past' });
       return;
     }
 
@@ -201,9 +205,9 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
       data: {
         engineerId,
         clientId,
-        attendeeName,
-        appointmentDate: new Date(appointmentDate),
-        location,
+        purpose,
+        visitDate: new Date(visitDate),
+        siteAddress,
         otpMobileNumber,
         status: 'SCHEDULED',
       },
@@ -214,8 +218,8 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
     });
 
     // Send SMS notifications
-    const dateStr = format(new Date(appointmentDate), 'MMM dd, yyyy');
-    const timeStr = format(new Date(appointmentDate), 'hh:mm a');
+    const dateStr = format(new Date(visitDate), 'MMM dd, yyyy');
+    const timeStr = format(new Date(visitDate), 'hh:mm a');
 
     // Send to client's primary contact
     await sendAppointmentNotification(
@@ -223,17 +227,17 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
       engineer.name,
       dateStr,
       timeStr,
-      location
+      siteAddress || client.address || 'Not specified'
     );
 
     // Send to engineer
     await sendAppointmentNotificationToEngineer(
-      engineer.phone,
+      engineer.mobileNumber,
       client.name,
       dateStr,
       timeStr,
-      location,
-      attendeeName
+      siteAddress || client.address || 'Not specified',
+      purpose || 'Visit scheduled'
     );
 
     res.status(201).json(appointment);
@@ -249,7 +253,7 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
 export const updateAppointment = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { appointmentDate, location, attendeeName, otpMobileNumber } = req.body;
+    const { visitDate, siteAddress, purpose, otpMobileNumber } = req.body;
 
     const existing = await prisma.appointment.findUnique({
       where: { id },
@@ -269,9 +273,9 @@ export const updateAppointment = async (req: Request, res: Response): Promise<vo
     const appointment = await prisma.appointment.update({
       where: { id },
       data: {
-        appointmentDate: appointmentDate ? new Date(appointmentDate) : undefined,
-        location,
-        attendeeName,
+        visitDate: visitDate ? new Date(visitDate) : undefined,
+        siteAddress,
+        purpose,
         otpMobileNumber,
       },
       include: {
@@ -345,7 +349,7 @@ export const getEngineerDashboard = async (req: Request, res: Response): Promise
         },
       },
       orderBy: {
-        appointmentDate: 'asc',
+        visitDate: 'asc',
       },
     });
 
@@ -406,6 +410,7 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
         otp,
         otpExpiresAt: otpExpiry,
         otpSentAt: new Date(),
+        otpAttempts: 0,
         status: 'OTP_SENT',
       },
     });
@@ -462,9 +467,26 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Check OTP attempts limit
+    if (appointment.otpAttempts >= 3) {
+      res.status(400).json({ error: 'Maximum OTP attempts exceeded. Please request a new OTP.' });
+      return;
+    }
+
     // Verify OTP
     if (appointment.otp !== otp) {
-      res.status(400).json({ error: 'Invalid OTP' });
+      // Increment failed attempts
+      await prisma.appointment.update({
+        where: { id },
+        data: {
+          otpAttempts: appointment.otpAttempts + 1,
+        },
+      });
+
+      res.status(400).json({
+        error: 'Invalid OTP',
+        attemptsRemaining: 2 - appointment.otpAttempts,
+      });
       return;
     }
 
@@ -474,6 +496,7 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       data: {
         status: 'VERIFIED',
         verifiedAt: new Date(),
+        otpAttempts: appointment.otpAttempts + 1,
       },
     });
 
@@ -545,12 +568,12 @@ export const getReports = async (req: Request, res: Response): Promise<void> => 
     const where: any = {};
 
     if (dateFrom || dateTo) {
-      where.appointmentDate = {};
+      where.visitDate = {};
       if (dateFrom) {
-        where.appointmentDate.gte = new Date(dateFrom as string);
+        where.visitDate.gte = new Date(dateFrom as string);
       }
       if (dateTo) {
-        where.appointmentDate.lte = new Date(dateTo as string);
+        where.visitDate.lte = new Date(dateTo as string);
       }
     }
 
@@ -584,7 +607,7 @@ export const getReports = async (req: Request, res: Response): Promise<void> => 
           },
         },
         orderBy: {
-          appointmentDate: 'desc',
+          visitDate: 'desc',
         },
       }),
       prisma.appointment.groupBy({

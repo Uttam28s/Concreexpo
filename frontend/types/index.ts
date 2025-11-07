@@ -218,6 +218,14 @@ export interface PaginatedResponse<T> {
   };
 }
 
+// Dashboard Stats Types
+export interface DashboardStats {
+  totalAppointments: number;
+  pendingVerifications: number;
+  completedToday: number;
+  upcomingAppointments: number;
+}
+
 // API Response Types
 export interface ApiResponse<T = any> {
   data: T;

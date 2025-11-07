@@ -47,7 +47,7 @@ export const getClients = async (req: Request, res: Response): Promise<void> => 
         page: Number(page),
         limit: Number(limit),
         total,
-        pages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (error) {
@@ -99,13 +99,12 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
       address,
       primaryContact,
       clientTypeId,
-      alternateContactName,
-      alternateContactPhone,
+      secondaryContact,
     } = req.body;
 
-    // Validate required fields
-    if (!name || !address || !primaryContact || !clientTypeId) {
-      res.status(400).json({ error: 'Missing required fields' });
+    // Validate required fields (only name and primaryContact are required)
+    if (!name || !primaryContact) {
+      res.status(400).json({ error: 'Name and primary contact are required' });
       return;
     }
 
@@ -115,14 +114,16 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Check if client type exists
-    const clientType = await prisma.clientType.findUnique({
-      where: { id: clientTypeId },
-    });
+    // Check if client type exists (if provided)
+    if (clientTypeId) {
+      const clientType = await prisma.clientType.findUnique({
+        where: { id: clientTypeId },
+      });
 
-    if (!clientType) {
-      res.status(404).json({ error: 'Client type not found' });
-      return;
+      if (!clientType) {
+        res.status(404).json({ error: 'Client type not found' });
+        return;
+      }
     }
 
     const client = await prisma.client.create({
@@ -131,8 +132,7 @@ export const createClient = async (req: Request, res: Response): Promise<void> =
         address,
         primaryContact,
         clientTypeId,
-        alternateContactName,
-        alternateContactPhone,
+        secondaryContact,
       },
       include: {
         clientType: true,
@@ -157,8 +157,7 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
       address,
       primaryContact,
       clientTypeId,
-      alternateContactName,
-      alternateContactPhone,
+      secondaryContact,
       isActive,
     } = req.body;
 
@@ -185,8 +184,7 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
         address,
         primaryContact,
         clientTypeId,
-        alternateContactName,
-        alternateContactPhone,
+        secondaryContact,
         isActive,
       },
       include: {
