@@ -1,0 +1,107 @@
+================================================================================
+  CONCREEXPO - Quick Setup Instructions for Windows
+================================================================================
+
+🚀 FIRST TIME SETUP (Do this once)
+================================================================================
+
+1. Install Prerequisites:
+   ✓ Node.js (v18+): https://nodejs.org/
+   ✓ PostgreSQL (v14+): https://www.postgresql.org/download/windows/
+
+2. Create PostgreSQL Database:
+   - Open pgAdmin or command line
+   - Create database: flooring_db
+
+3. Configure Backend:
+   - Open: backend\.env
+   - Update DATABASE_URL with your PostgreSQL password:
+     DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/flooring_db"
+
+4. Run Setup Scripts:
+   a) Double-click: setup-backend.bat
+      (Installs dependencies, creates database tables, seeds admin user)
+
+   b) Double-click: setup-frontend.bat
+      (Installs frontend dependencies)
+
+================================================================================
+🎯 DAILY USAGE (Every time you work on the project)
+================================================================================
+
+1. Start Backend:
+   Double-click: start-backend.bat
+   Wait for: "Server running on http://localhost:3001"
+
+2. Start Frontend (in a NEW window):
+   Double-click: start-frontend.bat
+   Wait for: "Ready in X.Xs"
+
+3. Open Browser:
+   Go to: http://localhost:3000
+
+4. Login:
+   Email: admin@example.com
+   Password: Admin@123456
+
+================================================================================
+📝 IMPORTANT NOTES
+================================================================================
+
+- Keep BOTH terminal windows open while working
+- Backend must be running before frontend
+- Press Ctrl+C to stop servers
+- If port is busy, close other apps or restart computer
+
+================================================================================
+🆘 TROUBLESHOOTING
+================================================================================
+
+Problem: "Port 3001 already in use"
+Solution:
+  - Close all terminal windows
+  - Restart computer
+  - Or change port in backend\.env
+
+Problem: "Database connection failed"
+Solution:
+  - Check PostgreSQL service is running (services.msc)
+  - Verify database 'flooring_db' exists
+  - Check password in DATABASE_URL
+
+Problem: "Cannot find module"
+Solution:
+  - Run setup scripts again
+  - Or manually: cd backend && npm install
+
+================================================================================
+📚 DETAILED DOCUMENTATION
+================================================================================
+
+For complete setup guide with troubleshooting:
+See: WINDOWS_SETUP.md
+
+For API documentation:
+See: BACKEND_API_TESTING.md
+
+For project overview:
+See: README.md
+
+================================================================================
+✅ SUCCESS CHECKLIST
+================================================================================
+
+After setup, you should have:
+[ ] PostgreSQL installed and running
+[ ] Database 'flooring_db' created
+[ ] backend\.env configured with DATABASE_URL
+[ ] Backend setup completed (setup-backend.bat)
+[ ] Frontend setup completed (setup-frontend.bat)
+[ ] Backend starts successfully (start-backend.bat)
+[ ] Frontend starts successfully (start-frontend.bat)
+[ ] Can access http://localhost:3000
+[ ] Can login with admin credentials
+
+================================================================================
+
+Need help? Check WINDOWS_SETUP.md for detailed troubleshooting!
