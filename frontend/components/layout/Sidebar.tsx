@@ -91,8 +91,18 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen bg-slate-900 border-r border-slate-800 transition-all duration-300',
-        sidebarCollapsed ? 'w-20' : 'w-72'
+        'fixed left-0 top-0 h-screen bg-slate-900 border-r border-slate-800 transition-all duration-300',
+        // Z-index: higher than overlay (z-30) but below modals
+        'z-40',
+        // Mobile: always full width when visible, hide/show with translate
+        'w-72',
+        // Desktop: collapse/expand behavior (width only, no translation)
+        sidebarCollapsed ? 'lg:w-20' : 'lg:w-72',
+        // Mobile: hide/show behavior (translate off-screen when collapsed)
+        // On mobile, translate when collapsed; on desktop, never translate
+        sidebarCollapsed 
+          ? '-translate-x-full lg:translate-x-0' 
+          : 'translate-x-0'
       )}
     >
       <div className="flex flex-col h-full">

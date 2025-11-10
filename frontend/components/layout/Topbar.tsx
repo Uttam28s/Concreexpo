@@ -24,6 +24,10 @@ export function Topbar() {
   const { user, logout } = useAuthStore();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
 
+  const handleToggleSidebar = () => {
+    toggleSidebar();
+  };
+
   const handleLogout = async () => {
     try {
       await authApi.logout();
@@ -49,19 +53,21 @@ export function Topbar() {
   return (
     <header
       className={cn(
-        'fixed top-0 right-0 z-30 h-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 transition-all duration-300',
-        sidebarCollapsed ? 'left-20' : 'left-72'
+        'fixed top-0 z-30 h-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-800 transition-all duration-300',
+        sidebarCollapsed ? 'lg:left-20' : 'lg:left-72',
+        'left-0 right-0'
       )}
     >
       <div className="h-full px-6 flex items-center justify-between">
         {/* Left Section */}
         <div className="flex items-center space-x-4">
-          {/* Mobile Menu Toggle */}
+          {/* Menu Toggle - visible on all screen sizes */}
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleSidebar}
-            className="lg:hidden text-slate-400 hover:text-slate-200"
+            onClick={handleToggleSidebar}
+            className="text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+            aria-label="Toggle sidebar"
           >
             <Menu size={20} />
           </Button>

@@ -207,7 +207,7 @@ export default function EngineerDashboardPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
         </div>
-      ) : appointments.length === 0 ? (
+      ) : appointments?.length === 0 ? (
         <Card className="bg-slate-900 border-slate-800">
           <CardContent className="py-12">
             <div className="text-center">
@@ -221,7 +221,7 @@ export default function EngineerDashboardPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {appointments.map((appointment) => (
+          {appointments?.map((appointment) => (
             <Card
               key={appointment.id}
               className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-all duration-200"
@@ -379,7 +379,7 @@ export default function EngineerDashboardPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={otpLoading || otp.length !== 6}
+                disabled={otpLoading || otp?.length !== 6}
                 className="gradient-primary text-white"
               >
                 {otpLoading ? (

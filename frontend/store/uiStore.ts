@@ -7,7 +7,8 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  sidebarCollapsed: false,
+  // Start with collapsed=true for mobile (will be set correctly on client mount)
+  sidebarCollapsed: true,
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 }));

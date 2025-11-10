@@ -71,7 +71,7 @@ export default function LoginPage() {
       </div>
 
       <Card className="w-full max-w-md relative z-10 bg-slate-800/80 backdrop-blur-xl border-slate-700 shadow-2xl">
-        <CardHeader className="space-y-4 text-center">
+        <CardHeader className="space-y-4 text-center align-center">
           {/* Logo */}
           <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
             <div className="text-3xl font-bold text-white">C</div>
@@ -156,10 +156,10 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 font-medium mb-2">Demo Credentials:</p>
             <div className="space-y-1 text-xs">
               <p className="text-slate-500">
-                <span className="text-blue-400">Admin:</span> admin@wallfloor.com / Admin@123456
+                <span className="text-blue-400">Admin:</span> admin@example.com / Admin@123456
               </p>
               <p className="text-slate-500">
-                <span className="text-purple-400">Engineer:</span> engineer@wallfloor.com / Engineer@123
+                <span className="text-purple-400">Engineer:</span> engineer@example.com / Engineer@123
               </p>
             </div>
           </div>

@@ -16,7 +16,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
-  const { sidebarCollapsed } = useUIStore();
+  const { sidebarCollapsed, setSidebarCollapsed } = useUIStore();
 
   // Protect dashboard routes
   useEffect(() => {
@@ -24,6 +24,15 @@ export default function DashboardLayout({
       router.push('/login');
     }
   }, [isAuthenticated, router]);
+
+  // Initialize desktop sidebar state on mount
+  useEffect(() => {
+    const isDesktop = window.innerWidth >= 1024;
+    if (isDesktop) {
+      // On desktop, start with sidebar expanded
+      setSidebarCollapsed(false);
+    }
+  }, [setSidebarCollapsed]);
 
   if (!isAuthenticated) {
     return (
@@ -53,7 +62,10 @@ export default function DashboardLayout({
       <main
         className={cn(
           'pt-20 transition-all duration-300',
-          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'
+          // Desktop: adjust padding based on sidebar state
+          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72',
+          // Mobile: no padding (sidebar is overlay)
+          'pl-0 lg:pl-0'
         )}
       >
         <div className="p-6 min-h-[calc(100vh-5rem)]">{children}</div>
