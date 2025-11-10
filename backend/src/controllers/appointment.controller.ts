@@ -109,7 +109,7 @@ export const getAppointment = async (req: Request, res: Response): Promise<void>
             id: true,
             name: true,
             email: true,
-            phone: true,
+            mobileNumber: true,
           },
         },
         client: {

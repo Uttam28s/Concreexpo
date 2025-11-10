@@ -263,7 +263,7 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
               name: true,
             },
           },
-          user: {
+          createdByUser: {
             select: {
               name: true,
               email: true,
@@ -297,7 +297,7 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
 /**
  * Get dashboard statistics
  */
-export const getDashboardStats = async (req: Request, res: Response): Promise<void> => {
+export const getDashboardStats = async (_req: Request, res: Response): Promise<void> => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -537,7 +537,7 @@ export const getBySiteReport = async (req: Request, res: Response): Promise<void
 /**
  * Get stock balance report
  */
-export const getBalanceReport = async (req: Request, res: Response): Promise<void> => {
+export const getBalanceReport = async (_req: Request, res: Response): Promise<void> => {
   try {
     const materials = await prisma.material.findMany({
       where: { isActive: true },

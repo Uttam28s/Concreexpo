@@ -256,7 +256,7 @@ export const deleteClient = async (req: Request, res: Response): Promise<void> =
 /**
  * Get all client types
  */
-export const getClientTypes = async (req: Request, res: Response): Promise<void> => {
+export const getClientTypes = async (_req: Request, res: Response): Promise<void> => {
   try {
     const types = await prisma.clientType.findMany({
       include: {

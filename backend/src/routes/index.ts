@@ -10,7 +10,7 @@ import workerVisitRoutes from './workerVisit.routes';
 const router = Router();
 
 // Health check
-router.get('/health', (req, res) => {
+router.get('/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Concreexpo API is running' });
 });
 

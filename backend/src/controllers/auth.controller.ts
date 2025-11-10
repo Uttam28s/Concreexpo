@@ -69,7 +69,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
+        mobileNumber: user.mobileNumber,
         role: user.role,
       },
       accessToken,
@@ -84,7 +84,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 /**
  * User logout
  */
-export const logout = async (req: Request, res: Response): Promise<void> => {
+export const logout = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Clear cookies
     res.clearCookie('accessToken');
@@ -154,7 +154,7 @@ export const me = async (req: Request, res: Response): Promise<void> => {
         id: true,
         name: true,
         email: true,
-        phone: true,
+        mobileNumber: true,
         role: true,
         isActive: true,
         createdAt: true,

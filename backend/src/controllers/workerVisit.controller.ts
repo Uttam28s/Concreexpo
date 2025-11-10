@@ -158,7 +158,7 @@ export const submitWorkerCount = async (req: Request, res: Response): Promise<vo
     }
 
     // Check if OTP expired (24 hours)
-    if (isOTPExpired(visit.otpExpiresAt)) {
+    if (!visit.otpExpiresAt || isOTPExpired(visit.otpExpiresAt)) {
       res.status(400).json({ error: 'OTP has expired. Please create a new visit.' });
       return;
     }
