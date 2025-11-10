@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useUIStore } from '@/store/uiStore';
@@ -15,22 +15,41 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const { sidebarCollapsed } = useUIStore();
+  const [isClient, setIsClient] = useState(false);
 
-  // Protect dashboard routes
+  // Wait for client-side hydration
   useEffect(() => {
-    if (!isAuthenticated) {
+    setIsClient(true);
+  }, []);
+
+  // Protect dashboard routes - only after hydration
+  useEffect(() => {
+    if (_hasHydrated && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, _hasHydrated, router]);
 
-  if (!isAuthenticated) {
+  // Show loading during SSR or before hydration
+  if (!isClient || !_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-slate-400">Redirecting to login...</p>
         </div>
       </div>
     );
