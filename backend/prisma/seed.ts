@@ -9,10 +9,10 @@ async function main() {
   // Create admin user
   const adminPassword = await bcrypt.hash('Admin@123456', 10);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@wallfloor.com' },
+    where: { email: 'admin@example.com' },
     update: {},
     create: {
-      email: 'admin@wallfloor.com',
+      email: 'admin@example.com',
       password: adminPassword,
       name: 'Admin User',
       mobileNumber: '+919876543210',
@@ -25,10 +25,10 @@ async function main() {
   // Create demo engineer
   const engineerPassword = await bcrypt.hash('Engineer@123', 10);
   const engineer = await prisma.user.upsert({
-    where: { email: 'engineer@wallfloor.com' },
+    where: { email: 'engineer@example.com' },
     update: {},
     create: {
-      email: 'engineer@wallfloor.com',
+      email: 'engineer@example.com',
       password: engineerPassword,
       name: 'John Engineer',
       mobileNumber: '+919876543211',
@@ -70,16 +70,20 @@ async function main() {
   ];
 
   for (const materialName of materials) {
-    await prisma.material.upsert({
+    const existingMaterial = await prisma.material.findFirst({
       where: { name: materialName },
-      update: {},
-      create: {
-        name: materialName,
-        unit: 'Bucket',
-        reorderLevel: 20,
-        isActive: true,
-      },
     });
+
+    if (!existingMaterial) {
+      await prisma.material.create({
+        data: {
+          name: materialName,
+          unit: 'Bucket',
+          reorderLevel: 20,
+          isActive: true,
+        },
+      });
+    }
   }
   console.log('✅ Materials created');
 
@@ -111,7 +115,7 @@ async function main() {
     update: {},
     create: {
       key: 'company_name',
-      value: 'WallFloor',
+      value: 'Concreexpo',
     },
   });
 
