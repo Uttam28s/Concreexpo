@@ -176,8 +176,8 @@ export default function InventoryPage() {
     }
   };
 
-  const filteredStock = stockData.filter((item) =>
-    item.material.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStock = (stockData || []).filter((item) =>
+    item.material?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

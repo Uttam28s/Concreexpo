@@ -138,7 +138,10 @@ export function Sidebar() {
             )}
             <ul className="space-y-1">
               {filterByRole(mainNavItems).map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                // For /dashboard, only match exactly, not sub-routes
+                const isActive = item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <li key={item.href}>
                     <Link
