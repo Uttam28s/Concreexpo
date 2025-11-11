@@ -98,10 +98,11 @@ export default function WorkerCountsPage() {
         search: searchTerm,
       });
       const data = response.data as PaginatedResponse<WorkerVisit>;
-      setVisits(data.data);
-      setTotalPages(data.pagination.totalPages);
+      setVisits(data?.data || []);
+      setTotalPages(data?.pagination?.totalPages || 1);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch visits');
+      setVisits([]);
     } finally {
       setLoading(false);
     }
@@ -111,9 +112,10 @@ export default function WorkerCountsPage() {
     try {
       setLoading(true);
       const response = await workerVisitApi.getPending();
-      setPendingVisits(response.data.data);
+      setPendingVisits(response.data.data || []);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch pending visits');
+      setPendingVisits([]);
     } finally {
       setLoading(false);
     }
@@ -123,9 +125,10 @@ export default function WorkerCountsPage() {
     try {
       const response = await clientApi.getAll({ limit: 1000 });
       const data = response.data as PaginatedResponse<Client>;
-      setClients(data.data.filter((c) => c.isActive));
+      setClients((data?.data || []).filter((c) => c.isActive));
     } catch (error: any) {
       console.error('Failed to fetch clients:', error);
+      setClients([]);
     }
   };
 
@@ -133,9 +136,10 @@ export default function WorkerCountsPage() {
     try {
       const response = await engineerApi.getAll({ limit: 1000 });
       const data = response.data as PaginatedResponse<Engineer>;
-      setEngineers(data.data.filter((e) => e.isActive));
+      setEngineers((data?.data || []).filter((e) => e.isActive));
     } catch (error: any) {
       console.error('Failed to fetch engineers:', error);
+      setEngineers([]);
     }
   };
 
@@ -249,7 +253,7 @@ export default function WorkerCountsPage() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
           </div>
-        ) : pendingVisits.length === 0 ? (
+        ) : (pendingVisits || []).length === 0 ? (
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="py-12">
               <div className="text-center">
@@ -263,7 +267,7 @@ export default function WorkerCountsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {pendingVisits.map((visit) => {
+            {(pendingVisits || []).map((visit) => {
               const isExpired = visit.otpExpiresAt && isPast(new Date(visit.otpExpiresAt));
 
               return (

@@ -91,9 +91,10 @@ export default function ClientsPage() {
   const fetchClientTypes = async () => {
     try {
       const response = await clientApi.getTypes();
-      setClientTypes(response.data.data);
+      setClientTypes(response.data?.data || []);
     } catch (error: any) {
       console.error('Failed to fetch client types:', error);
+      setClientTypes([]);
     }
   };
 

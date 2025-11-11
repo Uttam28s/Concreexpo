@@ -77,7 +77,7 @@ export const clientApi = {
   create: (data: any) => api.post('/clients', data),
   update: (id: string, data: any) => api.put(`/clients/${id}`, data),
   delete: (id: string) => api.delete(`/clients/${id}`),
-  getTypes: () => api.get('/clients/types/all'),
+  getTypes: () => api.get('/clients/types'),
   createType: (name: string) => api.post('/clients/types', { name }),
 };
 
@@ -128,7 +128,7 @@ export const inventoryApi = {
 
 // Worker Visit API
 export const workerVisitApi = {
-  getAll: (params?: any) => api.get('/worker-visits', { params }),
+  getAll: (params?: any) => api.get('/worker-visits/all', { params }),
   getById: (id: string) => api.get(`/worker-visits/${id}`),
   create: (data: any) => api.post('/worker-visits', data),
   submitCount: (id: string, data: any) => api.post(`/worker-visits/${id}/submit-count`, data),
