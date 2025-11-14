@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { inventoryApi, materialApi, appointmentApi } from '@/lib/api';
-import { StockBalance, Material, Appointment, PaginatedResponse } from '@/types';
+import { inventoryApi, materialApi, appointmentApi, clientApi } from '@/lib/api';
+import { StockBalance, Material, Appointment, Client, PaginatedResponse, InventoryTransaction } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
   Search,
@@ -42,6 +43,9 @@ import {
   PlusCircle,
   MinusCircle,
   Boxes,
+  Building2,
+  MapPin,
+  Calendar,
 } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -49,8 +53,12 @@ export default function InventoryPage() {
   const [stockData, setStockData] = useState<StockBalance[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [siteTransactions, setSiteTransactions] = useState<InventoryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [siteTransactionsLoading, setSiteTransactionsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('stock');
 
   // Side panels
   const [isStockInOpen, setIsStockInOpen] = useState(false);
@@ -69,6 +77,7 @@ export default function InventoryPage() {
   const [stockOutData, setStockOutData] = useState({
     materialId: '',
     quantity: '',
+    clientId: '',
     siteAddress: '',
     appointmentId: '',
     remarks: '',
@@ -80,7 +89,14 @@ export default function InventoryPage() {
     fetchStockData();
     fetchMaterials();
     fetchAppointments();
+    fetchClients();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'sites') {
+      fetchSiteTransactions();
+    }
+  }, [activeTab]);
 
   const fetchStockData = async () => {
     try {
@@ -113,6 +129,31 @@ export default function InventoryPage() {
       setAppointments(data.data.filter((a) => ['VERIFIED', 'COMPLETED'].includes(a.status)));
     } catch (error: any) {
       console.error('Failed to fetch appointments:', error);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const response = await clientApi.getAll({ limit: 1000 });
+      const data = response.data as PaginatedResponse<Client>;
+      setClients((data.data || []).filter((c) => c.isActive));
+    } catch (error: any) {
+      console.error('Failed to fetch clients:', error);
+    }
+  };
+
+  const fetchSiteTransactions = async () => {
+    try {
+      setSiteTransactionsLoading(true);
+      const response = await inventoryApi.getTransactions({
+        type: 'STOCK_OUT',
+        limit: 1000,
+      });
+      setSiteTransactions(response.data.data || []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch site transactions');
+    } finally {
+      setSiteTransactionsLoading(false);
     }
   };
 
@@ -152,6 +193,7 @@ export default function InventoryPage() {
       await inventoryApi.stockOut({
         materialId: stockOutData.materialId,
         quantity: Number(stockOutData.quantity),
+        clientId: stockOutData.clientId || undefined,
         siteAddress: stockOutData.siteAddress || undefined,
         appointmentId: stockOutData.appointmentId || undefined,
         remarks: stockOutData.remarks || undefined,
@@ -163,12 +205,17 @@ export default function InventoryPage() {
       setStockOutData({
         materialId: '',
         quantity: '',
+        clientId: '',
         siteAddress: '',
         appointmentId: '',
         remarks: '',
         transactionDate: new Date().toISOString().split('T')[0],
       });
       fetchStockData();
+      // Refresh site transactions if on that tab
+      if (activeTab === 'sites') {
+        fetchSiteTransactions();
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to remove stock');
     } finally {
@@ -221,8 +268,20 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {/* Stock Table */}
-      <Card className="bg-slate-900 border-slate-800">
+      {/* Tabs for Stock and Site Transactions */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-slate-900 border-slate-800">
+          <TabsTrigger value="stock" className="data-[state=active]:bg-slate-800">
+            Material Inventory
+          </TabsTrigger>
+          <TabsTrigger value="sites" className="data-[state=active]:bg-slate-800">
+            Site Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Stock Table */}
+        <TabsContent value="stock">
+          <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
             Current Stock Levels ({filteredStock.length})
@@ -310,6 +369,115 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Site Transactions Tab */}
+        <TabsContent value="sites">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-slate-100">
+                Materials Sent to Sites ({siteTransactions.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {siteTransactionsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                </div>
+              ) : siteTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <MapPin className="mx-auto h-12 w-12 text-slate-600" />
+                  <p className="mt-4 text-slate-400">No site transactions found</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Stock out materials will appear here
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
+                        <TableHead className="text-slate-300">Date</TableHead>
+                        <TableHead className="text-slate-300">Material</TableHead>
+                        <TableHead className="text-slate-300">Client/Site</TableHead>
+                        <TableHead className="text-slate-300 text-right">Quantity</TableHead>
+                        <TableHead className="text-slate-300">Site Address</TableHead>
+                        <TableHead className="text-slate-300">Remarks</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {siteTransactions.map((transaction) => (
+                        <TableRow
+                          key={transaction.id}
+                          className="border-slate-800 hover:bg-slate-800/30"
+                        >
+                          <TableCell>
+                            <div className="flex items-center text-slate-300 text-sm">
+                              <Calendar className="w-4 h-4 mr-2 text-blue-400" />
+                              {new Date(transaction.transactionDate).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                                <Package className="w-4 h-4 text-amber-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-200">{transaction.material.name}</p>
+                                <p className="text-xs text-slate-500">{transaction.material.unit}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.client ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                                  <Building2 className="w-4 h-4 text-blue-400" />
+                                </div>
+                                <span className="font-medium text-slate-200">
+                                  {transaction.client.name}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end text-red-400">
+                              <TrendingDown className="w-3 h-3 mr-1" />
+                              <span className="font-medium">{transaction.quantity}</span>
+                              <span className="text-sm text-slate-400 ml-1">{transaction.material.unit}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.siteAddress ? (
+                              <div className="flex items-start text-slate-400 text-sm max-w-xs">
+                                <MapPin className="w-3 h-3 mr-1.5 mt-0.5 text-slate-500 flex-shrink-0" />
+                                <span className="line-clamp-2">{transaction.siteAddress}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {transaction.remarks ? (
+                              <span className="text-slate-400 text-sm line-clamp-1">
+                                {transaction.remarks}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Stock In Sheet */}
       <Sheet open={isStockInOpen} onOpenChange={setIsStockInOpen}>
@@ -491,6 +659,34 @@ export default function InventoryPage() {
                 className="bg-slate-800 border-slate-700 text-slate-100"
                 placeholder="Enter quantity"
               />
+            </div>
+
+            {/* Client */}
+            <div className="space-y-2">
+              <Label htmlFor="stockOutClient" className="text-slate-200">
+                Client/Site (Optional)
+              </Label>
+              <Select
+                value={stockOutData.clientId || undefined}
+                onValueChange={(value) =>
+                  setStockOutData({ ...stockOutData, clientId: value })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {clients.map((client) => (
+                    <SelectItem
+                      key={client.id}
+                      value={client.id}
+                      className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
+                    >
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Site Address */}
