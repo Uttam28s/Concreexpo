@@ -71,7 +71,7 @@ export const getAppointments = async (req: Request, res: Response): Promise<void
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
         orderBy: {
-          visitDate: 'desc',
+          createdAt: 'desc',
         },
       }),
       prisma.appointment.count({ where }),

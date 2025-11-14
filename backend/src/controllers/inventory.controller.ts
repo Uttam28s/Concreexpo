@@ -275,9 +275,10 @@ export const getTransactions = async (req: Request, res: Response): Promise<void
         },
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
-        orderBy: {
-          transactionDate: 'desc',
-        },
+        orderBy: [
+          { transactionDate: 'desc' },
+          { createdAt: 'desc' },
+        ],
       }),
       prisma.inventoryTransaction.count({ where }),
     ]);

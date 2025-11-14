@@ -58,6 +58,7 @@ export default function AppointmentsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // OTP Dialog
@@ -103,6 +104,7 @@ export default function AppointmentsPage() {
       const data = response.data as PaginatedResponse<Appointment>;
       setAppointments(data.data);
       setTotalPages(data.pagination.totalPages);
+      setTotalCount(data.pagination.total);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch appointments');
     } finally {
@@ -272,23 +274,34 @@ export default function AppointmentsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Appointments</h1>
-          <p className="text-slate-400 mt-1">Manage client site visits and verifications</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Appointments</h1>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Manage client site visits and verifications</p>
         </div>
+        {/* Desktop Button */}
         {user?.role === 'ADMIN' && (
           <Button
             onClick={handleOpenDialog}
-            className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+            className="hidden md:flex gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
           >
             <Plus className="mr-2 h-4 w-4" />
             Schedule Appointment
           </Button>
         )}
       </div>
+
+      {/* Mobile Floating Action Button */}
+      {user?.role === 'ADMIN' && (
+        <Button
+          onClick={handleOpenDialog}
+          className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary text-white shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 p-0"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
 
       {/* Search */}
       <Card className="bg-slate-900 border-slate-800">
@@ -312,7 +325,7 @@ export default function AppointmentsPage() {
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
-            All Appointments ({appointments.length})
+            All Appointments ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
