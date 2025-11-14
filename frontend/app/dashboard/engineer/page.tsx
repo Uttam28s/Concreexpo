@@ -63,9 +63,10 @@ export default function EngineerDashboardPage() {
     try {
       setLoading(true);
       const response = await appointmentApi.getDashboard();
-      setAppointments(response.data.data);
+      setAppointments(response.data?.data || []);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch appointments');
+      setAppointments([]);
     } finally {
       setLoading(false);
     }

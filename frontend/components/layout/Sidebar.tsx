@@ -62,6 +62,7 @@ const masterNavItems: NavItem[] = [
     title: 'Clients',
     href: '/dashboard/clients',
     icon: Building2,
+    roles: ['ADMIN'],
   },
   {
     title: 'Engineers',
@@ -73,6 +74,7 @@ const masterNavItems: NavItem[] = [
     title: 'Materials',
     href: '/dashboard/materials',
     icon: Boxes,
+    roles: ['ADMIN'],
   },
 ];
 
@@ -169,17 +171,18 @@ export function Sidebar() {
             </ul>
           </div>
 
-          <Separator className="bg-slate-800" />
-
-          {/* Masters Section */}
-          <div>
-            {!sidebarCollapsed && (
-              <h2 className="px-3 mb-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Masters
-              </h2>
-            )}
-            <ul className="space-y-1">
-              {filterByRole(masterNavItems).map((item) => {
+          {/* Masters Section - Only show for roles with access */}
+          {filterByRole(masterNavItems).length > 0 && (
+            <>
+              <Separator className="bg-slate-800" />
+              <div>
+                {!sidebarCollapsed && (
+                  <h2 className="px-3 mb-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Masters
+                  </h2>
+                )}
+                <ul className="space-y-1">
+                  {filterByRole(masterNavItems).map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 return (
                   <li key={item.href}>
@@ -207,6 +210,8 @@ export function Sidebar() {
               })}
             </ul>
           </div>
+            </>
+          )}
         </nav>
 
         {/* Settings at Bottom */}

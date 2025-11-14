@@ -271,7 +271,7 @@ export const getClientTypes = async (_req: Request, res: Response): Promise<void
       },
     });
 
-    res.json(types);
+    res.json({ data: types });
   } catch (error) {
     console.error('Get client types error:', error);
     res.status(500).json({ error: 'Failed to fetch client types' });
