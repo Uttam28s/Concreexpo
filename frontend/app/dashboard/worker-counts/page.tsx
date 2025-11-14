@@ -501,6 +501,122 @@ export default function WorkerCountsPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Create Visit Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Create Worker Count Visit</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Schedule a new worker count visit (OTP will be sent to client)
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleCreateVisit} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="client" className="text-slate-200">
+                  Client *
+                </Label>
+                {clients.length === 0 ? (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p className="text-sm text-yellow-400">
+                      No clients available. Please ask admin to create a client first.
+                    </p>
+                  </div>
+                ) : (
+                  <Select
+                    value={createData.clientId}
+                    onValueChange={(value) =>
+                      setCreateData({ ...createData, clientId: value })
+                    }
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                      {clients.map((client) => (
+                        <SelectItem
+                          key={client.id}
+                          value={client.id}
+                          className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
+                        >
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="visitDate" className="text-slate-200">
+                  Visit Date *
+                </Label>
+                <Input
+                  id="visitDate"
+                  type="date"
+                  value={createData.visitDate}
+                  onChange={(e) =>
+                    setCreateData({ ...createData, visitDate: e.target.value })
+                  }
+                  required
+                  className="bg-slate-800 border-slate-700 text-slate-100"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="siteAddress" className="text-slate-200">
+                  Site Address
+                </Label>
+                <Input
+                  id="siteAddress"
+                  value={createData.siteAddress}
+                  onChange={(e) =>
+                    setCreateData({ ...createData, siteAddress: e.target.value })
+                  }
+                  className="bg-slate-800 border-slate-700 text-slate-100"
+                  placeholder="123 Main Street, City"
+                />
+              </div>
+
+              <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+                <p className="text-xs text-blue-400">
+                  <Send className="w-3 h-3 inline mr-1" />
+                  OTP will be sent to client when this visit is created
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  OTP is valid for 24 hours with no attempt limit
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={createLoading}
+                  className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createLoading || clients.length === 0}
+                  className="gradient-primary text-white"
+                >
+                  {createLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Visit'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
