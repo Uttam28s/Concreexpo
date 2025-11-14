@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { inventoryApi, materialApi, appointmentApi } from '@/lib/api';
-import { StockBalance, Material, Appointment, PaginatedResponse } from '@/types';
+import { inventoryApi, materialApi, appointmentApi, clientApi } from '@/lib/api';
+import { StockBalance, Material, Appointment, PaginatedResponse, Client, InventoryTransaction } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -42,6 +43,7 @@ import {
   PlusCircle,
   MinusCircle,
   Boxes,
+  MapPin,
 } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -49,8 +51,12 @@ export default function InventoryPage() {
   const [stockData, setStockData] = useState<StockBalance[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [siteTransactions, setSiteTransactions] = useState<InventoryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [siteTransactionsLoading, setSiteTransactionsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('inventory');
 
   // Side panels
   const [isStockInOpen, setIsStockInOpen] = useState(false);
@@ -69,6 +75,7 @@ export default function InventoryPage() {
   const [stockOutData, setStockOutData] = useState({
     materialId: '',
     quantity: '',
+    clientId: '',
     siteAddress: '',
     appointmentId: '',
     remarks: '',
@@ -80,7 +87,14 @@ export default function InventoryPage() {
     fetchStockData();
     fetchMaterials();
     fetchAppointments();
+    fetchClients();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'site-transactions') {
+      fetchSiteTransactions();
+    }
+  }, [activeTab]);
 
   const fetchStockData = async () => {
     try {
@@ -113,6 +127,32 @@ export default function InventoryPage() {
       setAppointments(data.data.filter((a) => ['VERIFIED', 'COMPLETED'].includes(a.status)));
     } catch (error: any) {
       console.error('Failed to fetch appointments:', error);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const response = await clientApi.getAll({ limit: 1000 });
+      const data = response.data as PaginatedResponse<Client>;
+      setClients(data.data.filter((c) => c.isActive));
+    } catch (error: any) {
+      console.error('Failed to fetch clients:', error);
+    }
+  };
+
+  const fetchSiteTransactions = async () => {
+    try {
+      setSiteTransactionsLoading(true);
+      const response = await inventoryApi.getTransactions({
+        transactionType: 'STOCK_OUT',
+        limit: 1000,
+      });
+      const data = response.data as PaginatedResponse<InventoryTransaction>;
+      setSiteTransactions(data.data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch site transactions');
+    } finally {
+      setSiteTransactionsLoading(false);
     }
   };
 
@@ -152,6 +192,7 @@ export default function InventoryPage() {
       await inventoryApi.stockOut({
         materialId: stockOutData.materialId,
         quantity: Number(stockOutData.quantity),
+        clientId: stockOutData.clientId || undefined,
         siteAddress: stockOutData.siteAddress || undefined,
         appointmentId: stockOutData.appointmentId || undefined,
         remarks: stockOutData.remarks || undefined,
@@ -163,12 +204,16 @@ export default function InventoryPage() {
       setStockOutData({
         materialId: '',
         quantity: '',
+        clientId: '',
         siteAddress: '',
         appointmentId: '',
         remarks: '',
         transactionDate: new Date().toISOString().split('T')[0],
       });
       fetchStockData();
+      if (activeTab === 'site-transactions') {
+        fetchSiteTransactions();
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to remove stock');
     } finally {
@@ -221,95 +266,217 @@ export default function InventoryPage() {
         </CardContent>
       </Card>
 
-      {/* Stock Table */}
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-slate-100">
-            Current Stock Levels ({filteredStock.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
-            </div>
-          ) : filteredStock.length === 0 ? (
-            <div className="text-center py-12">
-              <Boxes className="mx-auto h-12 w-12 text-slate-600" />
-              <p className="mt-4 text-slate-400">No stock data found</p>
-              <p className="text-sm text-slate-500 mt-1">
-                {searchTerm
-                  ? 'Try adjusting your search'
-                  : 'Add materials to track inventory'}
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-slate-800 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
-                    <TableHead className="text-slate-300">Material</TableHead>
-                    <TableHead className="text-slate-300 text-right">Stock In</TableHead>
-                    <TableHead className="text-slate-300 text-right">Stock Out</TableHead>
-                    <TableHead className="text-slate-300 text-right">Current Stock</TableHead>
-                    <TableHead className="text-slate-300">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredStock.map((item) => (
-                    <TableRow
-                      key={item.materialId}
-                      className="border-slate-800 hover:bg-slate-800/30"
-                    >
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
-                            <Package className="w-5 h-5 text-amber-400" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-slate-200">{item.material.name}</p>
-                            <p className="text-xs text-slate-500">{item.material.unit}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end text-green-400">
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          <span className="font-medium">{item.totalIn}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end text-red-400">
-                          <TrendingDown className="w-3 h-3 mr-1" />
-                          <span className="font-medium">{item.totalOut}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="text-xl font-bold text-slate-100">
-                          {item.currentStock}
-                        </span>
-                        <span className="text-sm text-slate-400 ml-1">{item.material.unit}</span>
-                      </TableCell>
-                      <TableCell>
-                        {item.isLowStock ? (
-                          <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30">
-                            <AlertTriangle className="w-3 h-3 mr-1" />
-                            Low Stock
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-green-500/10 text-green-400 border-green-500/30">
-                            In Stock
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs for Inventory and Site Transactions */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-slate-900 border border-slate-800">
+          <TabsTrigger
+            value="inventory"
+            className="data-[state=active]:bg-slate-800 data-[state=active]:text-slate-100"
+          >
+            Material Inventory
+          </TabsTrigger>
+          <TabsTrigger
+            value="site-transactions"
+            className="data-[state=active]:bg-slate-800 data-[state=active]:text-slate-100"
+          >
+            Materials Sent to Sites
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Material Inventory Tab */}
+        <TabsContent value="inventory" className="space-y-4">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-slate-100">
+                Current Stock Levels ({filteredStock.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                </div>
+              ) : filteredStock.length === 0 ? (
+                <div className="text-center py-12">
+                  <Boxes className="mx-auto h-12 w-12 text-slate-600" />
+                  <p className="mt-4 text-slate-400">No stock data found</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {searchTerm
+                      ? 'Try adjusting your search'
+                      : 'Add materials to track inventory'}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
+                        <TableHead className="text-slate-300">Material</TableHead>
+                        <TableHead className="text-slate-300 text-right">Stock In</TableHead>
+                        <TableHead className="text-slate-300 text-right">Stock Out</TableHead>
+                        <TableHead className="text-slate-300 text-right">Current Stock</TableHead>
+                        <TableHead className="text-slate-300">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredStock.map((item) => (
+                        <TableRow
+                          key={item.materialId}
+                          className="border-slate-800 hover:bg-slate-800/30"
+                        >
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                                <Package className="w-5 h-5 text-amber-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-200">{item.material.name}</p>
+                                <p className="text-xs text-slate-500">{item.material.unit}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end text-green-400">
+                              <TrendingUp className="w-3 h-3 mr-1" />
+                              <span className="font-medium">{item.totalIn}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end text-red-400">
+                              <TrendingDown className="w-3 h-3 mr-1" />
+                              <span className="font-medium">{item.totalOut}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xl font-bold text-slate-100">
+                              {item.currentStock}
+                            </span>
+                            <span className="text-sm text-slate-400 ml-1">{item.material.unit}</span>
+                          </TableCell>
+                          <TableCell>
+                            {item.isLowStock ? (
+                              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                <AlertTriangle className="w-3 h-3 mr-1" />
+                                Low Stock
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-green-500/10 text-green-400 border-green-500/30">
+                                In Stock
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Materials Sent to Sites Tab */}
+        <TabsContent value="site-transactions" className="space-y-4">
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-slate-100">
+                Materials Sent to Client Sites ({siteTransactions.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {siteTransactionsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                </div>
+              ) : siteTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <MapPin className="mx-auto h-12 w-12 text-slate-600" />
+                  <p className="mt-4 text-slate-400">No materials sent to sites yet</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Use Stock Out to send materials to client sites
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
+                        <TableHead className="text-slate-300">Material</TableHead>
+                        <TableHead className="text-slate-300">Client</TableHead>
+                        <TableHead className="text-slate-300">Site Address</TableHead>
+                        <TableHead className="text-slate-300 text-right">Quantity</TableHead>
+                        <TableHead className="text-slate-300">Date</TableHead>
+                        <TableHead className="text-slate-300">Remarks</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {siteTransactions.map((transaction) => (
+                        <TableRow
+                          key={transaction.id}
+                          className="border-slate-800 hover:bg-slate-800/30"
+                        >
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center">
+                                <Package className="w-5 h-5 text-amber-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-200">{transaction.material.name}</p>
+                                <p className="text-xs text-slate-500">{transaction.material.unit}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.client ? (
+                              <div>
+                                <p className="font-medium text-slate-200">{transaction.client.name}</p>
+                                {transaction.client.primaryContact && (
+                                  <p className="text-xs text-slate-500">{transaction.client.primaryContact}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {transaction.siteAddress ? (
+                              <div className="flex items-start space-x-1 max-w-xs">
+                                <MapPin className="w-3 h-3 text-slate-500 mt-1 flex-shrink-0" />
+                                <span className="text-slate-300 text-sm">{transaction.siteAddress}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end text-red-400">
+                              <TrendingDown className="w-3 h-3 mr-1" />
+                              <span className="font-medium">{transaction.quantity}</span>
+                              <span className="text-xs text-slate-500 ml-1">{transaction.material.unit}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-slate-300 text-sm">
+                              {new Date(transaction.transactionDate).toLocaleDateString()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {transaction.remarks ? (
+                              <span className="text-slate-400 text-sm">{transaction.remarks}</span>
+                            ) : (
+                              <span className="text-slate-500 text-sm">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Stock In Sheet */}
       <Sheet open={isStockInOpen} onOpenChange={setIsStockInOpen}>
@@ -493,6 +660,35 @@ export default function InventoryPage() {
               />
             </div>
 
+            {/* Client */}
+            <div className="space-y-2">
+              <Label htmlFor="stockOutClient" className="text-slate-200">
+                Client / Site
+              </Label>
+              <Select
+                value={stockOutData.clientId || undefined}
+                onValueChange={(value) =>
+                  setStockOutData({ ...stockOutData, clientId: value })
+                }
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                  <SelectValue placeholder="Select client (Optional)" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {clients.map((client) => (
+                    <SelectItem
+                      key={client.id}
+                      value={client.id}
+                      className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
+                    >
+                      {client.name}
+                      {client.address && ` - ${client.address}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Site Address */}
             <div className="space-y-2">
               <Label htmlFor="stockOutSite" className="text-slate-200">
@@ -505,7 +701,7 @@ export default function InventoryPage() {
                   setStockOutData({ ...stockOutData, siteAddress: e.target.value })
                 }
                 className="bg-slate-800 border-slate-700 text-slate-100"
-                placeholder="Delivery location"
+                placeholder="Delivery location (Optional)"
               />
             </div>
 

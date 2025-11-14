@@ -130,6 +130,8 @@ export interface InventoryTransaction {
   transactionType: TransactionType;
   quantity: number;
   siteAddress?: string | null;
+  clientId?: string | null;
+  client?: Client | null;
   appointmentId?: string | null;
   appointment?: Appointment | null;
   remarks?: string | null;
@@ -160,6 +162,7 @@ export interface CreateStockInDto {
 export interface CreateStockOutDto {
   materialId: string;
   quantity: number;
+  clientId?: string;
   siteAddress?: string;
   appointmentId?: string;
   remarks?: string;
