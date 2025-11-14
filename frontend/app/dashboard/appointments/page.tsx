@@ -45,6 +45,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -58,6 +59,17 @@ export default function AppointmentsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // OTP Dialog
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  // Feedback Dialog
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -168,6 +180,54 @@ export default function AppointmentsPage() {
       fetchAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send OTP');
+    }
+  };
+
+  const handleOpenOtpDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setOtp('');
+    setIsOtpDialogOpen(true);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAppointment) return;
+
+    setOtpLoading(true);
+    try {
+      await appointmentApi.verifyOtp(selectedAppointment.id, otp);
+      toast.success('OTP verified successfully');
+      setIsOtpDialogOpen(false);
+      setOtp('');
+      fetchAppointments();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Invalid OTP');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleOpenFeedbackDialog = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setFeedback(appointment.feedback || '');
+    setIsFeedbackDialogOpen(true);
+  };
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAppointment) return;
+
+    setFeedbackLoading(true);
+    try {
+      await appointmentApi.submitFeedback(selectedAppointment.id, feedback);
+      toast.success('Feedback submitted successfully');
+      setIsFeedbackDialogOpen(false);
+      setFeedback('');
+      fetchAppointments();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to submit feedback');
+    } finally {
+      setFeedbackLoading(false);
     }
   };
 
@@ -326,16 +386,57 @@ export default function AppointmentsPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(appointment.status)}</TableCell>
                         <TableCell className="text-right">
-                          {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleSendOtp(appointment.id)}
-                              className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
-                            >
-                              <Send className="h-3 w-3 mr-1" />
-                              Send OTP
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-2">
+                            {/* Admin Actions */}
+                            {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendOtp(appointment.id)}
+                                className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Send OTP
+                              </Button>
+                            )}
+
+                            {/* Engineer Actions */}
+                            {user?.role === 'ENGINEER' && appointment.engineerId === user.id && (
+                              <>
+                                {appointment.status === 'SCHEDULED' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleSendOtp(appointment.id)}
+                                    className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                                  >
+                                    <Send className="h-3 w-3 mr-1" />
+                                    Send OTP
+                                  </Button>
+                                )}
+
+                                {appointment.status === 'OTP_SENT' && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenOtpDialog(appointment)}
+                                    className="gradient-primary text-white"
+                                  >
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Verify OTP
+                                  </Button>
+                                )}
+
+                                {(appointment.status === 'VERIFIED' || appointment.status === 'COMPLETED') && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleOpenFeedbackDialog(appointment)}
+                                    className="bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30"
+                                  >
+                                    <MessageSquare className="h-3 w-3 mr-1" />
+                                    {appointment.feedback ? 'Edit Feedback' : 'Add Feedback'}
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -572,6 +673,145 @@ export default function AppointmentsPage() {
                   </>
                 ) : (
                   'Create Appointment'
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Verification Dialog */}
+      <Dialog open={isOtpDialogOpen} onOpenChange={setIsOtpDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle>Verify OTP</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Enter the OTP sent to the client
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleVerifyOtp} className="space-y-4 mt-4">
+            {selectedAppointment && (
+              <div className="p-4 bg-slate-800/50 rounded-lg space-y-2">
+                <p className="text-sm text-slate-400">Client:</p>
+                <p className="font-medium text-slate-200">{selectedAppointment.client.name}</p>
+                <p className="text-xs text-slate-500">
+                  OTP sent to: {selectedAppointment.otpMobileNumber || selectedAppointment.client.primaryContact}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="otp" className="text-slate-200">
+                Enter OTP *
+              </Label>
+              <Input
+                id="otp"
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+                maxLength={6}
+                className="bg-slate-800 border-slate-700 text-slate-100 text-center text-2xl tracking-widest"
+                placeholder="000000"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsOtpDialogOpen(false)}
+                disabled={otpLoading}
+                className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={otpLoading}
+                className="gradient-primary text-white"
+              >
+                {otpLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Verify OTP
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feedback Dialog */}
+      <Dialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAppointment?.feedback ? 'Edit Feedback' : 'Add Feedback'}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Share your notes and observations from the site visit
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitFeedback} className="space-y-4 mt-4">
+            {selectedAppointment && (
+              <div className="p-4 bg-slate-800/50 rounded-lg space-y-2">
+                <p className="text-sm text-slate-400">Appointment:</p>
+                <p className="font-medium text-slate-200">{selectedAppointment.client.name}</p>
+                <p className="text-xs text-slate-500">
+                  {format(new Date(selectedAppointment.visitDate), 'MMM dd, yyyy hh:mm a')}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="feedback" className="text-slate-200">
+                Feedback / Notes *
+              </Label>
+              <textarea
+                id="feedback"
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                rows={5}
+                required
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
+                placeholder="Enter your observations, measurements, site condition, materials needed, etc..."
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsFeedbackDialogOpen(false)}
+                disabled={feedbackLoading}
+                className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={feedbackLoading}
+                className="bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30"
+              >
+                {feedbackLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Submit Feedback
+                  </>
                 )}
               </Button>
             </div>
