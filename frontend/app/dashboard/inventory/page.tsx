@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import {
   Search,
   Package,
@@ -46,6 +47,9 @@ import {
   Building2,
   MapPin,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
 } from 'lucide-react';
 
 export default function InventoryPage() {
@@ -59,6 +63,10 @@ export default function InventoryPage() {
   const [siteTransactionsLoading, setSiteTransactionsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('stock');
+  const [sitePage, setSitePage] = useState(1);
+  const [siteTotalPages, setSiteTotalPages] = useState(1);
+  const [siteTotalCount, setSiteTotalCount] = useState(0);
+  const [stockTotalCount, setStockTotalCount] = useState(0);
 
   // Side panels
   const [isStockInOpen, setIsStockInOpen] = useState(false);
@@ -96,7 +104,7 @@ export default function InventoryPage() {
     if (activeTab === 'sites') {
       fetchSiteTransactions();
     }
-  }, [activeTab]);
+  }, [activeTab, sitePage]);
 
   const fetchStockData = async () => {
     try {
@@ -104,7 +112,9 @@ export default function InventoryPage() {
       const response = await inventoryApi.getStock({
         search: searchTerm,
       });
-      setStockData(response.data.data);
+      const data = response.data.data;
+      setStockData(data);
+      setStockTotalCount(data.length);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch stock data');
     } finally {
@@ -147,9 +157,13 @@ export default function InventoryPage() {
       setSiteTransactionsLoading(true);
       const response = await inventoryApi.getTransactions({
         type: 'STOCK_OUT',
-        limit: 1000,
+        page: sitePage,
+        limit: 10,
       });
-      setSiteTransactions(response.data.data || []);
+      const data = response.data as PaginatedResponse<InventoryTransaction>;
+      setSiteTransactions(data.data || []);
+      setSiteTotalPages(data.pagination.totalPages);
+      setSiteTotalCount(data.pagination.total);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch site transactions');
     } finally {
@@ -228,14 +242,15 @@ export default function InventoryPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Inventory Management</h1>
-          <p className="text-slate-400 mt-1">Track stock levels and transactions</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Inventory Management</h1>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Track stock levels and transactions</p>
         </div>
-        <div className="flex space-x-3">
+        {/* Desktop Buttons */}
+        <div className="hidden md:flex space-x-3">
           <Button
             onClick={() => setIsStockInOpen(true)}
             className="bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30"
@@ -251,6 +266,24 @@ export default function InventoryPage() {
             Stock Out
           </Button>
         </div>
+      </div>
+
+      {/* Mobile Floating Action Buttons */}
+      <div className="md:hidden fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        <Button
+          onClick={() => setIsStockInOpen(true)}
+          className="h-14 w-14 rounded-full bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30 shadow-lg shadow-green-500/20 hover:shadow-green-500/40 p-0"
+          title="Stock In"
+        >
+          <PlusCircle className="h-6 w-6" />
+        </Button>
+        <Button
+          onClick={() => setIsStockOutOpen(true)}
+          className="h-14 w-14 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 p-0"
+          title="Stock Out"
+        >
+          <MinusCircle className="h-6 w-6" />
+        </Button>
       </div>
 
       {/* Search */}
@@ -284,7 +317,7 @@ export default function InventoryPage() {
           <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
-            Current Stock Levels ({filteredStock.length})
+            Current Stock Levels ({stockTotalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -303,7 +336,9 @@ export default function InventoryPage() {
               </p>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-800 overflow-hidden">
+            <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -366,6 +401,64 @@ export default function InventoryPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {filteredStock.map((item) => (
+                <Card key={item.materialId} className="bg-slate-800/50 border-slate-700">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Material Name & Status */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Package className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-200">{item.material.name}</p>
+                          <p className="text-xs text-slate-500">{item.material.unit}</p>
+                        </div>
+                      </div>
+                      {item.isLowStock ? (
+                        <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/30 flex-shrink-0">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          Low
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-green-500/10 text-green-400 border-green-500/30 flex-shrink-0">
+                          In Stock
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Stock Metrics */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center text-green-400 mb-1">
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                        </div>
+                        <p className="text-sm font-medium text-slate-200">{item.totalIn}</p>
+                        <p className="text-xs text-slate-500">Stock In</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center text-red-400 mb-1">
+                          <TrendingDown className="w-3 h-3 mr-1" />
+                        </div>
+                        <p className="text-sm font-medium text-slate-200">{item.totalOut}</p>
+                        <p className="text-xs text-slate-500">Stock Out</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center text-blue-400 mb-1">
+                          <Boxes className="w-3 h-3" />
+                        </div>
+                        <p className="text-lg font-bold text-slate-100">{item.currentStock}</p>
+                        <p className="text-xs text-slate-500">Current</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -376,7 +469,7 @@ export default function InventoryPage() {
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader>
               <CardTitle className="text-slate-100">
-                Materials Sent to Sites ({siteTransactions.length})
+                Materials Sent to Sites ({siteTotalCount})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -393,7 +486,9 @@ export default function InventoryPage() {
                   </p>
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-800 overflow-hidden">
+                <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -473,6 +568,104 @@ export default function InventoryPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {siteTransactions.map((transaction) => (
+                    <Card key={transaction.id} className="bg-slate-800/50 border-slate-700">
+                      <CardContent className="p-4 space-y-3">
+                        {/* Date */}
+                        <div className="flex items-center text-slate-300 text-sm">
+                          <Calendar className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0" />
+                          <span>{format(new Date(transaction.transactionDate), 'MMM dd, yyyy')}</span>
+                        </div>
+
+                        {/* Material */}
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Package className="w-4 h-4 text-amber-400" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs text-slate-500">Material</p>
+                            <p className="font-medium text-slate-200">{transaction.material.name}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center text-red-400">
+                              <TrendingDown className="w-3 h-3 mr-1" />
+                              <span className="font-medium">{transaction.quantity}</span>
+                              <span className="text-sm text-slate-400 ml-1">{transaction.material.unit}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Client/Site */}
+                        {transaction.client && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Building2 className="w-4 h-4 text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500">Client</p>
+                              <p className="font-medium text-slate-200">{transaction.client.name}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Site Address */}
+                        {transaction.siteAddress && (
+                          <div className="flex items-start space-x-2">
+                            <MapPin className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-slate-500">Site Address</p>
+                              <p className="text-sm text-slate-400">{transaction.siteAddress}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Remarks */}
+                        {transaction.remarks && (
+                          <div className="flex items-start space-x-2">
+                            <FileText className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-slate-500">Remarks</p>
+                              <p className="text-sm text-slate-400">{transaction.remarks}</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Pagination Controls */}
+                {siteTotalPages > 1 && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-800">
+                    <p className="text-sm text-slate-400">
+                      Page {sitePage} of {siteTotalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSitePage(sitePage - 1)}
+                        disabled={sitePage === 1}
+                        className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSitePage(sitePage + 1)}
+                        disabled={sitePage === siteTotalPages}
+                        className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                </>
               )}
             </CardContent>
           </Card>

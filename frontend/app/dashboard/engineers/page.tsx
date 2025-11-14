@@ -47,6 +47,7 @@ export default function EngineersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEngineer, setEditingEngineer] = useState<Engineer | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -86,6 +87,7 @@ export default function EngineersPage() {
       const data = response.data as PaginatedResponse<Engineer>;
       setEngineers(data.data);
       setTotalPages(data.pagination.totalPages);
+      setTotalCount(data.pagination.total);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch engineers');
     } finally {
@@ -179,21 +181,30 @@ export default function EngineersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Engineer Master</h1>
-          <p className="text-slate-400 mt-1">Manage engineer accounts and permissions</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Engineer Master</h1>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Manage engineer accounts and permissions</p>
         </div>
+        {/* Desktop Button */}
         <Button
           onClick={() => handleOpenDialog()}
-          className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+          className="hidden md:flex gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
         >
           <Plus className="mr-2 h-4 w-4" />
           Add Engineer
         </Button>
       </div>
+
+      {/* Mobile Floating Action Button */}
+      <Button
+        onClick={() => handleOpenDialog()}
+        className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary text-white shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 p-0"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       {/* Search */}
       <Card className="bg-slate-900 border-slate-800">
@@ -217,7 +228,7 @@ export default function EngineersPage() {
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
-            All Engineers ({engineers.length})
+            All Engineers ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -237,7 +248,8 @@ export default function EngineersPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-slate-800 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -316,6 +328,79 @@ export default function EngineersPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {engineers.map((engineer) => (
+                  <Card key={engineer.id} className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-4 space-y-3">
+                      {/* Name and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Wrench className="w-5 h-5 text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-200 truncate">{engineer.name}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => toggleStatus(engineer)}
+                          className="transition-transform hover:scale-105 flex-shrink-0"
+                        >
+                          <Badge
+                            className={
+                              engineer.isActive
+                                ? 'bg-green-500/10 text-green-400 border-green-500/30 cursor-pointer'
+                                : 'bg-red-500/10 text-red-400 border-red-500/30 cursor-pointer'
+                            }
+                          >
+                            {engineer.isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </button>
+                      </div>
+
+                      {/* Email */}
+                      <div className="flex items-center space-x-2">
+                        <Mail className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-slate-500">Email</p>
+                          <p className="text-sm text-slate-300">{engineer.email}</p>
+                        </div>
+                      </div>
+
+                      {/* Mobile */}
+                      <div className="flex items-center space-x-2">
+                        <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-slate-500">Mobile</p>
+                          <p className="text-sm text-slate-300">{engineer.mobileNumber}</p>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-slate-700">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleOpenDialog(engineer)}
+                          className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border-blue-500/30"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDelete(engineer.id, engineer.name)}
+                          className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/30"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {/* Pagination */}

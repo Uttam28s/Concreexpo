@@ -42,6 +42,7 @@ import {
   MapPin,
   Loader2,
   Building2,
+  Tag,
 } from 'lucide-react';
 
 export default function ClientsPage() {
@@ -52,6 +53,7 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -81,6 +83,7 @@ export default function ClientsPage() {
       const data = response.data as PaginatedResponse<Client>;
       setClients(data.data);
       setTotalPages(data.pagination.totalPages);
+      setTotalCount(data.pagination.total);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch clients');
     } finally {
@@ -163,21 +166,30 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Client Master</h1>
-          <p className="text-slate-400 mt-1">Manage all your clients and their information</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Client Master</h1>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Manage all your clients and their information</p>
         </div>
+        {/* Desktop Button */}
         <Button
           onClick={() => handleOpenDialog()}
-          className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+          className="hidden md:flex gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
         >
           <Plus className="mr-2 h-4 w-4" />
           Add Client
         </Button>
       </div>
+
+      {/* Mobile Floating Action Button */}
+      <Button
+        onClick={() => handleOpenDialog()}
+        className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary text-white shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 p-0"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       {/* Search and Filters */}
       <Card className="bg-slate-900 border-slate-800">
@@ -201,7 +213,7 @@ export default function ClientsPage() {
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
-            All Clients ({clients.length})
+            All Clients ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -221,7 +233,8 @@ export default function ClientsPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-slate-800 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -317,6 +330,100 @@ export default function ClientsPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {clients.map((client) => (
+                  <Card key={client.id} className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-4 space-y-3">
+                      {/* Name and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-200 truncate">{client.name}</p>
+                          </div>
+                        </div>
+                        <Badge
+                          className={
+                            client.isActive
+                              ? 'bg-green-500/10 text-green-400 border-green-500/30 flex-shrink-0'
+                              : 'bg-red-500/10 text-red-400 border-red-500/30 flex-shrink-0'
+                          }
+                        >
+                          {client.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+
+                      {/* Primary Contact */}
+                      <div className="flex items-center space-x-2">
+                        <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-slate-500">Primary</p>
+                          <p className="text-sm text-slate-300">{client.primaryContact}</p>
+                        </div>
+                      </div>
+
+                      {/* Secondary Contact */}
+                      {client.secondaryContact && (
+                        <div className="flex items-center space-x-2">
+                          <Phone className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-slate-500">Secondary</p>
+                            <p className="text-sm text-slate-400">{client.secondaryContact}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Client Type */}
+                      {client.clientType && (
+                        <div className="flex items-center space-x-2">
+                          <Tag className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-slate-500">Type</p>
+                            <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/30">
+                              {client.clientType.name}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Address */}
+                      {client.address && (
+                        <div className="flex items-start space-x-2">
+                          <MapPin className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-slate-500">Address</p>
+                            <p className="text-sm text-slate-400">{client.address}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t border-slate-700">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleOpenDialog(client)}
+                          className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border-blue-500/30"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleDelete(client.id, client.name)}
+                          className="flex-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border-red-500/30"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {/* Pagination */}

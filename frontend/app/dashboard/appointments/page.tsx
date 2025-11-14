@@ -345,7 +345,8 @@ export default function AppointmentsPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-slate-800 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -455,6 +456,121 @@ export default function AppointmentsPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {appointments.map((appointment) => (
+                  <Card key={appointment.id} className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-4 space-y-3">
+                      {/* Date and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center text-slate-300 text-sm">
+                          <CalendarIcon className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0" />
+                          <span>{format(new Date(appointment.visitDate), 'MMM dd, yyyy hh:mm a')}</span>
+                        </div>
+                        {getStatusBadge(appointment.status)}
+                      </div>
+
+                      {/* Client */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Client</p>
+                          <p className="font-medium text-slate-200">{appointment.client.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Engineer */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Engineer</p>
+                          <p className="text-slate-300">{appointment.engineer.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Site Address */}
+                      {appointment.siteAddress && (
+                        <div className="flex items-start space-x-2">
+                          <MapPin className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-slate-500">Site Address</p>
+                            <p className="text-sm text-slate-400">{appointment.siteAddress}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Purpose */}
+                      {appointment.purpose && (
+                        <div className="flex items-start space-x-2">
+                          <FileText className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-slate-500">Purpose</p>
+                            <p className="text-sm text-slate-400">{appointment.purpose}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
+                        {/* Admin Actions */}
+                        {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendOtp(appointment.id)}
+                            className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            Send OTP
+                          </Button>
+                        )}
+
+                        {/* Engineer Actions */}
+                        {user?.role === 'ENGINEER' && appointment.engineerId === user.id && (
+                          <>
+                            {appointment.status === 'SCHEDULED' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendOtp(appointment.id)}
+                                className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Send OTP
+                              </Button>
+                            )}
+
+                            {appointment.status === 'OTP_SENT' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleOpenOtpDialog(appointment)}
+                                className="flex-1 gradient-primary text-white"
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Verify OTP
+                              </Button>
+                            )}
+
+                            {(appointment.status === 'VERIFIED' || appointment.status === 'COMPLETED') && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleOpenFeedbackDialog(appointment)}
+                                className="flex-1 bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30"
+                              >
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                                {appointment.feedback ? 'Edit Feedback' : 'Add Feedback'}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {/* Pagination */}

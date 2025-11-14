@@ -58,6 +58,7 @@ export default function WorkerCountsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<WorkerVisit | null>(null);
@@ -101,6 +102,7 @@ export default function WorkerCountsPage() {
       const data = response.data as PaginatedResponse<WorkerVisit>;
       setVisits(data?.data || []);
       setTotalPages(data?.pagination?.totalPages || 1);
+      setTotalCount(data?.pagination?.total || 0);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to fetch visits');
       setVisits([]);
@@ -266,21 +268,30 @@ export default function WorkerCountsPage() {
   // Engineer View - Pending Visits
   if (user?.role === 'ENGINEER') {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pb-20 md:pb-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-100">Worker Count Visits</h1>
-            <p className="text-slate-400 mt-1">Create and submit worker counts for visits</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Worker Count Visits</h1>
+            <p className="text-slate-400 mt-1 text-sm md:text-base">Create and submit worker counts for visits</p>
           </div>
+          {/* Desktop Button */}
           <Button
             onClick={() => setIsCreateDialogOpen(true)}
-            className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+            className="hidden md:flex gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Visit
           </Button>
         </div>
+
+        {/* Mobile Floating Action Button */}
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary text-white shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 p-0"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -623,21 +634,30 @@ export default function WorkerCountsPage() {
 
   // Admin View - All Visits
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Worker Count Management</h1>
-          <p className="text-slate-400 mt-1">Track worker counts for contractor payments</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100">Worker Count Management</h1>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Track worker counts for contractor payments</p>
         </div>
+        {/* Desktop Button */}
         <Button
           onClick={() => setIsCreateDialogOpen(true)}
-          className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+          className="hidden md:flex gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
         >
           <Plus className="mr-2 h-4 w-4" />
           Create Visit
         </Button>
       </div>
+
+      {/* Mobile Floating Action Button */}
+      <Button
+        onClick={() => setIsCreateDialogOpen(true)}
+        className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary text-white shadow-lg shadow-blue-500/40 hover:shadow-blue-500/60 p-0"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
       {/* Search */}
       <Card className="bg-slate-900 border-slate-800">
@@ -661,7 +681,7 @@ export default function WorkerCountsPage() {
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <CardTitle className="text-slate-100">
-            All Worker Visits ({visits.length})
+            All Worker Visits ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -681,7 +701,8 @@ export default function WorkerCountsPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-slate-800 overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
@@ -750,6 +771,77 @@ export default function WorkerCountsPage() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {visits.map((visit) => (
+                  <Card key={visit.id} className="bg-slate-800/50 border-slate-700">
+                    <CardContent className="p-4 space-y-3">
+                      {/* Date and Status */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center text-slate-300 text-sm">
+                          <CalendarIcon className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0" />
+                          <span>{format(new Date(visit.visitDate), 'MMM dd, yyyy')}</span>
+                        </div>
+                        {getStatusBadge(visit.status)}
+                      </div>
+
+                      {/* Client */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Client</p>
+                          <p className="font-medium text-slate-200">{visit.client.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Engineer */}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Engineer</p>
+                          <p className="text-slate-300">{visit.engineer.name}</p>
+                        </div>
+                      </div>
+
+                      {/* Site Address */}
+                      {visit.siteAddress && (
+                        <div className="flex items-start space-x-2">
+                          <MapPin className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-slate-500">Site Address</p>
+                            <p className="text-sm text-slate-400">{visit.siteAddress}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Worker Count */}
+                      {visit.workerCount !== null && (
+                        <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                          <span className="text-sm text-slate-400">Worker Count:</span>
+                          <div className="flex items-center">
+                            <Users className="w-4 h-4 mr-1 text-green-400" />
+                            <span className="text-xl font-bold text-green-400">
+                              {visit.workerCount}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Remarks */}
+                      {visit.remarks && (
+                        <div className="text-xs text-slate-400 p-2 bg-slate-900/50 rounded border border-slate-700">
+                          {visit.remarks}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {/* Pagination */}
