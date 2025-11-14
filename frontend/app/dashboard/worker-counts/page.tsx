@@ -86,6 +86,7 @@ export default function WorkerCountsPage() {
       fetchEngineers();
     } else if (user?.role === 'ENGINEER') {
       fetchPendingVisits();
+      fetchClients(); // Engineers need clients list to create visits
     }
   }, [page, searchTerm, user]);
 
@@ -148,12 +149,17 @@ export default function WorkerCountsPage() {
     setCreateLoading(true);
 
     try {
+      // For engineers, use their own ID
+      const engineerId = user?.role === 'ENGINEER' ? user.id : createData.engineerId;
+
       await workerVisitApi.create({
-        ...createData,
+        clientId: createData.clientId,
+        engineerId,
+        visitDate: createData.visitDate,
         siteAddress: createData.siteAddress || undefined,
       });
 
-      toast.success('Worker visit created and OTP sent to client & admin');
+      toast.success('Worker visit created and OTP sent to client');
       setIsCreateDialogOpen(false);
       setCreateData({
         clientId: '',
@@ -244,9 +250,18 @@ export default function WorkerCountsPage() {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100">Worker Count Visits</h1>
-          <p className="text-slate-400 mt-1">Submit worker counts for pending visits</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-100">Worker Count Visits</h1>
+            <p className="text-slate-400 mt-1">Create and submit worker counts for visits</p>
+          </div>
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="gradient-primary text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Visit
+          </Button>
         </div>
 
         {loading ? (
@@ -675,33 +690,36 @@ export default function WorkerCountsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="engineer" className="text-slate-200">
-                Engineer *
-              </Label>
-              <Select
-                value={createData.engineerId}
-                onValueChange={(value) =>
-                  setCreateData({ ...createData, engineerId: value })
-                }
-                required
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
-                  <SelectValue placeholder="Select engineer" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  {engineers.map((engineer) => (
-                    <SelectItem
-                      key={engineer.id}
-                      value={engineer.id}
-                      className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
-                    >
-                      {engineer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Only show engineer selection for Admin */}
+            {user?.role === 'ADMIN' && (
+              <div className="space-y-2">
+                <Label htmlFor="engineer" className="text-slate-200">
+                  Engineer *
+                </Label>
+                <Select
+                  value={createData.engineerId}
+                  onValueChange={(value) =>
+                    setCreateData({ ...createData, engineerId: value })
+                  }
+                  required
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                    <SelectValue placeholder="Select engineer" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {engineers.map((engineer) => (
+                      <SelectItem
+                        key={engineer.id}
+                        value={engineer.id}
+                        className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
+                      >
+                        {engineer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="visitDate" className="text-slate-200">

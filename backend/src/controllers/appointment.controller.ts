@@ -326,17 +326,22 @@ export const cancelAppointment = async (req: Request, res: Response): Promise<vo
 
 /**
  * Get engineer's dashboard appointments
- * Shows all non-cancelled, non-completed appointments
+ * Shows only pending/upcoming appointments (not past or completed)
  */
 export const getEngineerDashboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.userId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const appointments = await prisma.appointment.findMany({
       where: {
         engineerId: userId,
         status: {
           notIn: ['CANCELLED', 'COMPLETED'],
+        },
+        visitDate: {
+          gte: today, // Only show appointments from today onwards
         },
       },
       include: {

@@ -90,6 +90,11 @@ export function Sidebar() {
     });
   };
 
+  // Get the correct dashboard href based on user role
+  const getDashboardHref = () => {
+    return user?.role === 'ENGINEER' ? '/dashboard/engineer' : '/dashboard';
+  };
+
   return (
     <aside
       className={cn(
@@ -111,7 +116,7 @@ export function Sidebar() {
         {/* Logo Section */}
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-800">
           {!sidebarCollapsed && (
-            <Link href="/dashboard" className="flex items-center space-x-3">
+            <Link href={getDashboardHref()} className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <span className="text-xl font-bold text-white">C</span>
               </div>
@@ -123,9 +128,9 @@ export function Sidebar() {
             </Link>
           )}
           {sidebarCollapsed && (
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto">
+            <Link href={getDashboardHref()} className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto">
               <span className="text-xl font-bold text-white">C</span>
-            </div>
+            </Link>
           )}
         </div>
 
@@ -140,14 +145,18 @@ export function Sidebar() {
             )}
             <ul className="space-y-1">
               {filterByRole(mainNavItems).map((item) => {
-                // For /dashboard, only match exactly, not sub-routes
-                const isActive = item.href === '/dashboard'
-                  ? pathname === '/dashboard'
+                // Use role-specific href for Dashboard
+                const actualHref = item.title === 'Dashboard' ? getDashboardHref() : item.href;
+
+                // Check if current page is active
+                const isActive = item.title === 'Dashboard'
+                  ? pathname === actualHref
                   : pathname === item.href || pathname.startsWith(item.href + '/');
+
                 return (
                   <li key={item.href}>
                     <Link
-                      href={item.href}
+                      href={actualHref}
                       className={cn(
                         'flex items-center px-3 py-3 rounded-lg transition-all duration-200 group',
                         isActive
