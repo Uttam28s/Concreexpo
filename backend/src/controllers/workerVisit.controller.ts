@@ -5,15 +5,33 @@ import { sendWorkerCountOTPToClient, sendWorkerCountOTPToAdmin } from '../servic
 import { format } from 'date-fns';
 
 /**
- * Create worker visit and send dual OTP (Engineer only)
+ * Create worker visit and send dual OTP (Admin and Engineer)
+ * Engineers can only create visits for themselves
+ * Admins can create visits for any engineer
  */
 export const createVisit = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { clientId, visitDate, siteAddress } = req.body;
+    const { clientId, engineerId, visitDate, siteAddress } = req.body;
     const userId = req.user?.userId;
+    const userRole = req.user?.role;
 
     if (!clientId || !visitDate) {
       res.status(400).json({ error: 'Client and visit date are required' });
+      return;
+    }
+
+    // Determine which engineer to assign
+    // For engineers: always use their own ID
+    // For admins: use provided engineerId or their own ID if not provided
+    let targetEngineerId = userId;
+    if (userRole === 'ADMIN' && engineerId) {
+      targetEngineerId = engineerId;
+    } else if (userRole === 'ENGINEER') {
+      targetEngineerId = userId; // Engineers can only create visits for themselves
+    }
+
+    if (!targetEngineerId) {
+      res.status(400).json({ error: 'Engineer ID is required' });
       return;
     }
 
@@ -28,12 +46,16 @@ export const createVisit = async (req: Request, res: Response): Promise<void> =>
     }
 
     // Get engineer details
-    const engineer = await prisma.user.findUnique({
-      where: { id: userId },
+    const engineer = await prisma.user.findFirst({
+      where: {
+        id: targetEngineerId,
+        role: 'ENGINEER',
+        isActive: true
+      },
     });
 
     if (!engineer) {
-      res.status(404).json({ error: 'Engineer not found' });
+      res.status(404).json({ error: 'Engineer not found or inactive' });
       return;
     }
 
@@ -44,7 +66,7 @@ export const createVisit = async (req: Request, res: Response): Promise<void> =>
     // Create visit
     const visit = await prisma.workerVisit.create({
       data: {
-        engineerId: userId!,
+        engineerId: targetEngineerId,
         clientId,
         visitDate: new Date(visitDate),
         siteAddress,
@@ -228,7 +250,7 @@ export const getPendingVisits = async (req: Request, res: Response): Promise<voi
       },
     });
 
-    res.json(visits);
+    res.json({ data: visits });
   } catch (error) {
     console.error('Get pending visits error:', error);
     res.status(500).json({ error: 'Failed to fetch pending visits' });
