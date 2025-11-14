@@ -122,6 +122,7 @@ model Appointment {
   visitDate       DateTime          @map("appointmentDate")
   purpose         String?
   siteAddress     String?
+  googleMapsLink  String?
   otpMobileNumber String?
   status          AppointmentStatus @default(SCHEDULED)
   otp             String?

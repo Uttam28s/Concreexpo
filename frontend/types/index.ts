@@ -97,6 +97,7 @@ export interface Appointment {
   visitDate: string;
   purpose?: string | null;
   siteAddress?: string | null;
+  googleMapsLink?: string | null;
   otpMobileNumber?: string | null;
   status: AppointmentStatus;
   otp?: string | null;
@@ -115,6 +116,7 @@ export interface CreateAppointmentDto {
   visitDate: string;
   purpose?: string;
   siteAddress?: string;
+  googleMapsLink?: string;
   otpMobileNumber?: string;
 }
 

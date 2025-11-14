@@ -29,6 +29,7 @@ import {
   XCircle,
   Phone,
   MessageSquare,
+  Navigation,
 } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -237,10 +238,13 @@ export default function EngineerDashboardPage() {
                       <CardTitle className="text-lg text-slate-100">
                         {appointment.client.name}
                       </CardTitle>
-                      <div className="flex items-center text-sm text-slate-400 mt-1">
+                      <a
+                        href={`tel:${appointment.client.primaryContact}`}
+                        className="flex items-center text-sm text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                      >
                         <Phone className="w-3 h-3 mr-1" />
                         {appointment.client.primaryContact}
-                      </div>
+                      </a>
                     </div>
                   </div>
                   {getDateBadge(appointment.visitDate)}
@@ -262,6 +266,19 @@ export default function EngineerDashboardPage() {
                     <MapPin className="w-4 h-4 mr-2 text-slate-500 mt-0.5 flex-shrink-0" />
                     <span className="text-sm">{appointment.siteAddress}</span>
                   </div>
+                )}
+
+                {/* Google Maps Link */}
+                {appointment.googleMapsLink && (
+                  <a
+                    href={appointment.googleMapsLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4 mr-2" />
+                    Get Directions
+                  </a>
                 )}
 
                 {/* Purpose */}

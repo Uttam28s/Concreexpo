@@ -153,6 +153,7 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
       purpose,
       visitDate,
       siteAddress,
+      googleMapsLink,
       otpMobileNumber,
     } = req.body;
 
@@ -208,6 +209,7 @@ export const createAppointment = async (req: Request, res: Response): Promise<vo
         purpose,
         visitDate: new Date(visitDate),
         siteAddress,
+        googleMapsLink,
         otpMobileNumber,
         status: 'SCHEDULED',
       },

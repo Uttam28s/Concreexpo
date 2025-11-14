@@ -67,6 +67,7 @@ export default function AppointmentsPage() {
     visitTime: '09:00', // Default time
     purpose: '',
     siteAddress: '',
+    googleMapsLink: '',
     otpMobileNumber: '',
   });
   const [formLoading, setFormLoading] = useState(false);
@@ -125,6 +126,7 @@ export default function AppointmentsPage() {
       visitTime: '09:00',
       purpose: '',
       siteAddress: '',
+      googleMapsLink: '',
       otpMobileNumber: '',
     });
     setIsDialogOpen(true);
@@ -144,6 +146,7 @@ export default function AppointmentsPage() {
         visitDate: visitDateTime,
         purpose: formData.purpose || undefined,
         siteAddress: formData.siteAddress || undefined,
+        googleMapsLink: formData.googleMapsLink || undefined,
         otpMobileNumber: formData.otpMobileNumber || undefined,
       };
 
@@ -490,6 +493,25 @@ export default function AppointmentsPage() {
                 className="bg-slate-800 border-slate-700 text-slate-100"
                 placeholder="123 Main Street, City"
               />
+            </div>
+
+            {/* Google Maps Link */}
+            <div className="space-y-2">
+              <Label htmlFor="googleMapsLink" className="text-slate-200">
+                Google Maps Link (Optional)
+              </Label>
+              <Input
+                id="googleMapsLink"
+                value={formData.googleMapsLink}
+                onChange={(e) =>
+                  setFormData({ ...formData, googleMapsLink: e.target.value })
+                }
+                className="bg-slate-800 border-slate-700 text-slate-100"
+                placeholder="https://maps.google.com/?q=..."
+              />
+              <p className="text-xs text-slate-500">
+                Engineer can tap to open directions in Google Maps
+              </p>
             </div>
 
             {/* Purpose */}
