@@ -290,7 +290,7 @@ async function main() {
         visitDate,
         purpose: purposes[Math.floor(Math.random() * purposes.length)],
         siteAddress: Math.random() > 0.3 ? client.address : undefined,
-        googleMapsLink: Math.random() > 0.6 ? `https://maps.google.com/?q=${encodeURIComponent(client.address)}` : undefined,
+        googleMapsLink: Math.random() > 0.6 && client.address ? `https://maps.google.com/?q=${encodeURIComponent(client.address)}` : undefined,
         otpMobileNumber: Math.random() > 0.7 ? client.primaryContact : undefined,
         status: status as any,
         otp: ['OTP_SENT', 'VERIFIED', 'COMPLETED'].includes(status) ? '123456' : undefined,
