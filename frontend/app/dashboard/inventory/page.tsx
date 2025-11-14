@@ -668,14 +668,14 @@ export default function InventoryPage() {
               <Select
                 value={stockOutData.clientId || undefined}
                 onValueChange={(value) =>
-                  setStockOutData({ ...stockOutData, clientId: value })
+                  setStockOutData({ ...stockOutData, clientId: value || '' })
                 }
               >
                 <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
                   <SelectValue placeholder="Select client (Optional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  {clients.map((client) => (
+                  {clients.filter(client => client.id && client.id.trim() !== '').map((client) => (
                     <SelectItem
                       key={client.id}
                       value={client.id}
