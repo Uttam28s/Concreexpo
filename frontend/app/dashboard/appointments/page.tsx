@@ -64,6 +64,7 @@ export default function AppointmentsPage() {
     clientId: '',
     engineerId: '',
     visitDate: '',
+    visitTime: '09:00', // Default time
     purpose: '',
     siteAddress: '',
     otpMobileNumber: '',
@@ -121,6 +122,7 @@ export default function AppointmentsPage() {
       clientId: '',
       engineerId: '',
       visitDate: '',
+      visitTime: '09:00',
       purpose: '',
       siteAddress: '',
       otpMobileNumber: '',
@@ -133,8 +135,13 @@ export default function AppointmentsPage() {
     setFormLoading(true);
 
     try {
+      // Combine date and time into ISO datetime string
+      const visitDateTime = `${formData.visitDate}T${formData.visitTime}:00`;
+
       const submitData = {
-        ...formData,
+        clientId: formData.clientId,
+        engineerId: formData.engineerId,
+        visitDate: visitDateTime,
         purpose: formData.purpose || undefined,
         siteAddress: formData.siteAddress || undefined,
         otpMobileNumber: formData.otpMobileNumber || undefined,
@@ -283,7 +290,7 @@ export default function AppointmentsPage() {
                         <TableCell>
                           <div className="flex items-center text-slate-300 text-sm">
                             <CalendarIcon className="w-4 h-4 mr-2 text-blue-400" />
-                            {format(new Date(appointment.visitDate), 'MMM dd, yyyy')}
+                            {format(new Date(appointment.visitDate), 'MMM dd, yyyy hh:mm a')}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -435,21 +442,38 @@ export default function AppointmentsPage() {
               </Select>
             </div>
 
-            {/* Visit Date */}
-            <div className="space-y-2">
-              <Label htmlFor="visitDate" className="text-slate-200">
-                Visit Date *
-              </Label>
-              <Input
-                id="visitDate"
-                type="date"
-                value={formData.visitDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, visitDate: e.target.value })
-                }
-                required
-                className="bg-slate-800 border-slate-700 text-slate-100"
-              />
+            {/* Visit Date and Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="visitDate" className="text-slate-200">
+                  Visit Date *
+                </Label>
+                <Input
+                  id="visitDate"
+                  type="date"
+                  value={formData.visitDate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, visitDate: e.target.value })
+                  }
+                  required
+                  className="bg-slate-800 border-slate-700 text-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="visitTime" className="text-slate-200">
+                  Visit Time *
+                </Label>
+                <Input
+                  id="visitTime"
+                  type="time"
+                  value={formData.visitTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, visitTime: e.target.value })
+                  }
+                  required
+                  className="bg-slate-800 border-slate-700 text-slate-100"
+                />
+              </div>
             </div>
 
             {/* Site Address */}

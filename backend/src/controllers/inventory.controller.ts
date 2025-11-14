@@ -193,20 +193,23 @@ export const getStock = async (req: Request, res: Response): Promise<void> => {
           _sum: { quantity: true },
         });
 
-        const currentStock = (stockIn._sum.quantity || 0) - (stockOut._sum.quantity || 0);
+        const totalIn = stockIn._sum.quantity || 0;
+        const totalOut = stockOut._sum.quantity || 0;
+        const currentStock = totalIn - totalOut;
         const isLowStock = material.reorderLevel ? currentStock < material.reorderLevel : false;
 
         return {
-          ...material,
+          materialId: material.id,
+          material: material,
           currentStock,
           isLowStock,
-          stockIn: stockIn._sum.quantity || 0,
-          stockOut: stockOut._sum.quantity || 0,
+          totalIn,
+          totalOut,
         };
       })
     );
 
-    res.json(stockLevels);
+    res.json({ data: stockLevels });
   } catch (error) {
     console.error('Get stock error:', error);
     res.status(500).json({ error: 'Failed to fetch stock levels' });

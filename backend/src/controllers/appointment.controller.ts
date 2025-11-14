@@ -326,6 +326,7 @@ export const cancelAppointment = async (req: Request, res: Response): Promise<vo
 
 /**
  * Get engineer's dashboard appointments
+ * Shows all non-cancelled, non-completed appointments
  */
 export const getEngineerDashboard = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -335,7 +336,7 @@ export const getEngineerDashboard = async (req: Request, res: Response): Promise
       where: {
         engineerId: userId,
         status: {
-          not: 'CANCELLED',
+          notIn: ['CANCELLED', 'COMPLETED'],
         },
       },
       include: {
@@ -353,7 +354,7 @@ export const getEngineerDashboard = async (req: Request, res: Response): Promise
       },
     });
 
-    res.json(appointments);
+    res.json({ data: appointments });
   } catch (error) {
     console.error('Get engineer dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard' });
