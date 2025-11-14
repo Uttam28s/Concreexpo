@@ -515,16 +515,15 @@ export default function InventoryPage() {
                 Link to Appointment (Optional)
               </Label>
               <Select
-                value={stockOutData.appointmentId}
+                value={stockOutData.appointmentId || undefined}
                 onValueChange={(value) =>
                   setStockOutData({ ...stockOutData, appointmentId: value })
                 }
               >
                 <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
-                  <SelectValue placeholder="Select appointment" />
+                  <SelectValue placeholder="None (Optional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="">None</SelectItem>
                   {appointments.map((appt) => (
                     <SelectItem
                       key={appt.id}
