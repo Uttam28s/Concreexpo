@@ -146,6 +146,24 @@ export default function WorkerCountsPage() {
 
   const handleCreateVisit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation
+    if (!createData.clientId) {
+      toast.error('Please select a client');
+      return;
+    }
+
+    if (!createData.visitDate) {
+      toast.error('Please select a visit date');
+      return;
+    }
+
+    // For Admin, validate engineer selection
+    if (user?.role === 'ADMIN' && !createData.engineerId) {
+      toast.error('Please select an engineer');
+      return;
+    }
+
     setCreateLoading(true);
 
     try {
@@ -666,28 +684,35 @@ export default function WorkerCountsPage() {
               <Label htmlFor="client" className="text-slate-200">
                 Client *
               </Label>
-              <Select
-                value={createData.clientId}
-                onValueChange={(value) =>
-                  setCreateData({ ...createData, clientId: value })
-                }
-                required
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
-                  <SelectValue placeholder="Select client" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  {clients.map((client) => (
-                    <SelectItem
-                      key={client.id}
-                      value={client.id}
-                      className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
-                    >
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {clients.length === 0 ? (
+                <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <p className="text-sm text-yellow-400">
+                    No clients available. Please create a client first.
+                  </p>
+                </div>
+              ) : (
+                <Select
+                  value={createData.clientId}
+                  onValueChange={(value) =>
+                    setCreateData({ ...createData, clientId: value })
+                  }
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    {clients.map((client) => (
+                      <SelectItem
+                        key={client.id}
+                        value={client.id}
+                        className="text-slate-100 focus:bg-slate-700 focus:text-slate-100"
+                      >
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Only show engineer selection for Admin */}
@@ -701,7 +726,6 @@ export default function WorkerCountsPage() {
                   onValueChange={(value) =>
                     setCreateData({ ...createData, engineerId: value })
                   }
-                  required
                 >
                   <SelectTrigger className="bg-slate-800 border-slate-700 text-slate-100">
                     <SelectValue placeholder="Select engineer" />
@@ -774,7 +798,7 @@ export default function WorkerCountsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={createLoading}
+                disabled={createLoading || clients.length === 0}
                 className="gradient-primary text-white"
               >
                 {createLoading ? (
