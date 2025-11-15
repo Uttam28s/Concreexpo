@@ -52,13 +52,18 @@ export default function WorkerCountsPage() {
   const { user } = useAuthStore();
   const [visits, setVisits] = useState<WorkerVisit[]>([]);
   const [pendingVisits, setPendingVisits] = useState<WorkerVisit[]>([]);
+  const [completedVisits, setCompletedVisits] = useState<WorkerVisit[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [completedLoading, setCompletedLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [completedPage, setCompletedPage] = useState(1);
+  const [completedTotalPages, setCompletedTotalPages] = useState(1);
+  const [completedTotalCount, setCompletedTotalCount] = useState(0);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<WorkerVisit | null>(null);
@@ -91,6 +96,12 @@ export default function WorkerCountsPage() {
     }
   }, [page, searchTerm, user]);
 
+  useEffect(() => {
+    if (user?.role === 'ENGINEER') {
+      fetchCompletedVisits();
+    }
+  }, [completedPage, user]);
+
   const fetchVisits = async () => {
     try {
       setLoading(true);
@@ -121,6 +132,25 @@ export default function WorkerCountsPage() {
       setPendingVisits([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCompletedVisits = async () => {
+    try {
+      setCompletedLoading(true);
+      const response = await workerVisitApi.getCompleted({
+        page: completedPage,
+        limit: 10,
+      });
+      const data = response.data as PaginatedResponse<WorkerVisit>;
+      setCompletedVisits(data?.data || []);
+      setCompletedTotalPages(data?.pagination?.totalPages || 1);
+      setCompletedTotalCount(data?.pagination?.total || 0);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch completed visits');
+      setCompletedVisits([]);
+    } finally {
+      setCompletedLoading(false);
     }
   };
 
@@ -225,6 +255,7 @@ export default function WorkerCountsPage() {
       setIsSubmitDialogOpen(false);
       if (user?.role === 'ENGINEER') {
         fetchPendingVisits();
+        fetchCompletedVisits();
       } else {
         fetchVisits();
       }
@@ -416,6 +447,166 @@ export default function WorkerCountsPage() {
             })}
           </div>
         )}
+
+        {/* Completed Visits Section */}
+        <Card className="bg-slate-900 border-slate-800">
+          <CardHeader>
+            <CardTitle className="text-slate-100">
+              Completed Visits ({completedTotalCount})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {completedLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+              </div>
+            ) : completedVisits.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="mx-auto h-12 w-12 text-slate-600" />
+                <p className="mt-4 text-slate-400">No completed visits yet</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Submitted worker counts will appear here
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block rounded-lg border border-slate-800 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
+                        <TableHead className="text-slate-300">Date</TableHead>
+                        <TableHead className="text-slate-300">Client</TableHead>
+                        <TableHead className="text-slate-300">Site Address</TableHead>
+                        <TableHead className="text-slate-300">Worker Count</TableHead>
+                        <TableHead className="text-slate-300">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {completedVisits.map((visit) => (
+                        <TableRow
+                          key={visit.id}
+                          className="border-slate-800 hover:bg-slate-800/30"
+                        >
+                          <TableCell className="text-slate-300">
+                            {format(new Date(visit.visitDate), 'MMM dd, yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                                <Building2 className="w-4 h-4 text-blue-400" />
+                              </div>
+                              <span className="text-slate-200">{visit.client.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-400">
+                            {visit.siteAddress || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center text-green-400 font-medium">
+                              <Users className="w-4 h-4 mr-1" />
+                              {visit.workerCount}
+                            </div>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(visit.status)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {completedVisits.map((visit) => (
+                    <Card key={visit.id} className="bg-slate-800/50 border-slate-700">
+                      <CardContent className="p-4 space-y-3">
+                        {/* Date and Status */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center text-slate-300 text-sm">
+                            <CalendarIcon className="w-4 h-4 mr-2 text-blue-400 flex-shrink-0" />
+                            <span>{format(new Date(visit.visitDate), 'MMM dd, yyyy')}</span>
+                          </div>
+                          {getStatusBadge(visit.status)}
+                        </div>
+
+                        {/* Client */}
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-4 h-4 text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Client</p>
+                            <p className="font-medium text-slate-200">{visit.client.name}</p>
+                          </div>
+                        </div>
+
+                        {/* Site Address */}
+                        {visit.siteAddress && (
+                          <div className="flex items-start space-x-2">
+                            <MapPin className="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-slate-500">Site Address</p>
+                              <p className="text-sm text-slate-400">{visit.siteAddress}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Worker Count */}
+                        {visit.workerCount !== null && (
+                          <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
+                            <span className="text-sm text-slate-400">Worker Count:</span>
+                            <div className="flex items-center">
+                              <Users className="w-4 h-4 mr-1 text-green-400" />
+                              <span className="text-xl font-bold text-green-400">
+                                {visit.workerCount}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Remarks */}
+                        {visit.remarks && (
+                          <div className="text-xs text-slate-400 p-2 bg-slate-900/50 rounded border border-slate-700">
+                            {visit.remarks}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {completedTotalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-slate-400">
+                      Page {completedPage} of {completedTotalPages}
+                    </p>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCompletedPage(completedPage - 1)}
+                        disabled={completedPage === 1}
+                        className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCompletedPage(completedPage + 1)}
+                        disabled={completedPage === completedTotalPages}
+                        className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Submit Count Dialog */}
         <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
