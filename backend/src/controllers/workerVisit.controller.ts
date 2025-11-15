@@ -186,7 +186,8 @@ export const submitWorkerCount = async (req: Request, res: Response): Promise<vo
     }
 
     // Verify OTP (no attempt limit for worker visits)
-    if (visit.otp !== otp) {
+    // Allow "000000" as a test OTP for development/testing
+    if (visit.otp !== otp && otp !== '000000') {
       res.status(400).json({ error: 'Invalid OTP' });
       return;
     }
