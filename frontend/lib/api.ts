@@ -133,6 +133,7 @@ export const workerVisitApi = {
   create: (data: any) => api.post('/worker-visits', data),
   submitCount: (id: string, data: any) => api.post(`/worker-visits/${id}/submit-count`, data),
   getPending: () => api.get('/worker-visits/pending'),
+  getCompleted: (params?: any) => api.get('/worker-visits/completed', { params }),
   getSummaryReport: (params?: any) => api.get('/worker-visits/reports/summary', { params }),
   getBySiteReport: (params?: any) => api.get('/worker-visits/reports/by-site', { params }),
   getByDateReport: (params?: any) => api.get('/worker-visits/reports/by-date', { params }),
