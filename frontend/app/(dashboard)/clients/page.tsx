@@ -61,7 +61,7 @@ export default function ClientsPage() {
     primaryContact: '',
     secondaryContact: '',
     address: '',
-    clientTypeId: '',
+    clientTypeId: 'none',
   });
   const [formLoading, setFormLoading] = useState(false);
 
@@ -105,7 +105,7 @@ export default function ClientsPage() {
         primaryContact: client.primaryContact,
         secondaryContact: client.secondaryContact || '',
         address: client.address || '',
-        clientTypeId: client.clientTypeId || '',
+        clientTypeId: client.clientTypeId || 'none',
       });
     } else {
       setEditingClient(null);
@@ -114,7 +114,7 @@ export default function ClientsPage() {
         primaryContact: '',
         secondaryContact: '',
         address: '',
-        clientTypeId: '',
+        clientTypeId: 'none',
       });
     }
     setIsDialogOpen(true);
@@ -129,7 +129,7 @@ export default function ClientsPage() {
         ...formData,
         secondaryContact: formData.secondaryContact || undefined,
         address: formData.address || undefined,
-        clientTypeId: formData.clientTypeId || undefined,
+        clientTypeId: formData.clientTypeId === 'none' ? undefined : formData.clientTypeId,
       };
 
       if (editingClient) {
@@ -431,7 +431,9 @@ export default function ClientsPage() {
                   <SelectValue placeholder="Select type (optional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none" className="text-slate-100 focus:bg-slate-700 focus:text-slate-100">
+                    None
+                  </SelectItem>
                   {clientTypes.map((type) => (
                     <SelectItem
                       key={type.id}

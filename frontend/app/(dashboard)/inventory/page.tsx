@@ -70,7 +70,7 @@ export default function InventoryPage() {
     materialId: '',
     quantity: '',
     siteAddress: '',
-    appointmentId: '',
+    appointmentId: 'none',
     remarks: '',
     transactionDate: new Date().toISOString().split('T')[0],
   });
@@ -153,7 +153,7 @@ export default function InventoryPage() {
         materialId: stockOutData.materialId,
         quantity: Number(stockOutData.quantity),
         siteAddress: stockOutData.siteAddress || undefined,
-        appointmentId: stockOutData.appointmentId || undefined,
+        appointmentId: stockOutData.appointmentId === 'none' ? undefined : stockOutData.appointmentId,
         remarks: stockOutData.remarks || undefined,
         transactionDate: stockOutData.transactionDate,
       });
@@ -164,7 +164,7 @@ export default function InventoryPage() {
         materialId: '',
         quantity: '',
         siteAddress: '',
-        appointmentId: '',
+        appointmentId: 'none',
         remarks: '',
         transactionDate: new Date().toISOString().split('T')[0],
       });
@@ -524,7 +524,9 @@ export default function InventoryPage() {
                   <SelectValue placeholder="Select appointment" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none" className="text-slate-100 focus:bg-slate-700 focus:text-slate-100">
+                    None
+                  </SelectItem>
                   {appointments.map((appt) => (
                     <SelectItem
                       key={appt.id}
