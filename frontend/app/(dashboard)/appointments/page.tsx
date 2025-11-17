@@ -45,6 +45,10 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Eye,
+  Phone,
+  Mail,
+  ExternalLink,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -58,6 +62,9 @@ export default function AppointmentsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -159,6 +166,25 @@ export default function AppointmentsPage() {
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send OTP');
     }
+  };
+
+  const handleViewDetails = async (appointmentId: string) => {
+    try {
+      setDetailLoading(true);
+      setIsDetailDialogOpen(true);
+      const response = await appointmentApi.getById(appointmentId);
+      setSelectedAppointment(response.data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to fetch appointment details');
+      setIsDetailDialogOpen(false);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetailDialog = () => {
+    setIsDetailDialogOpen(false);
+    setSelectedAppointment(null);
   };
 
   const getStatusBadge = (status: AppointmentStatus) => {
@@ -268,8 +294,8 @@ export default function AppointmentsPage() {
                     <TableRow className="bg-slate-800/50 hover:bg-slate-800/50">
                       <TableHead className="text-slate-300">Date</TableHead>
                       <TableHead className="text-slate-300">Client</TableHead>
-                      <TableHead className="text-slate-300">Engineer</TableHead>
-                      <TableHead className="text-slate-300">Site Address</TableHead>
+                      <TableHead className="text-slate-300 hidden md:table-cell">Engineer</TableHead>
+                      <TableHead className="text-slate-300 hidden lg:table-cell">Site Address</TableHead>
                       <TableHead className="text-slate-300">Status</TableHead>
                       <TableHead className="text-slate-300 text-right">Actions</TableHead>
                     </TableRow>
@@ -278,7 +304,8 @@ export default function AppointmentsPage() {
                     {appointments.map((appointment) => (
                       <TableRow
                         key={appointment.id}
-                        className="border-slate-800 hover:bg-slate-800/30"
+                        className="border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                        onClick={() => handleViewDetails(appointment.id)}
                       >
                         <TableCell>
                           <div className="flex items-center text-slate-300 text-sm">
@@ -296,7 +323,7 @@ export default function AppointmentsPage() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex items-center space-x-2">
                             <div className="w-8 h-8 bg-purple-500/10 rounded-lg flex items-center justify-center">
                               <User className="w-4 h-4 text-purple-400" />
@@ -304,7 +331,7 @@ export default function AppointmentsPage() {
                             <span className="text-slate-300">{appointment.engineer.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           {appointment.siteAddress ? (
                             <div className="flex items-start text-slate-400 text-sm max-w-xs">
                               <MapPin className="w-3 h-3 mr-1.5 mt-0.5 text-slate-500 flex-shrink-0" />
@@ -315,17 +342,32 @@ export default function AppointmentsPage() {
                           )}
                         </TableCell>
                         <TableCell>{getStatusBadge(appointment.status)}</TableCell>
-                        <TableCell className="text-right">
-                          {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Mobile View Details Button */}
                             <Button
                               size="sm"
-                              onClick={() => handleSendOtp(appointment.id)}
-                              className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                              variant="ghost"
+                              onClick={() => handleViewDetails(appointment.id)}
+                              className="md:hidden text-blue-400 hover:bg-blue-500/10"
                             >
-                              <Send className="h-3 w-3 mr-1" />
-                              Send OTP
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          )}
+                            {/* Send OTP Button for Admin */}
+                            {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendOtp(appointment.id);
+                                }}
+                                className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                <span className="hidden sm:inline">Send OTP</span>
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -530,6 +572,228 @@ export default function AppointmentsPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={handleCloseDetailDialog}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-blue-400" />
+              Appointment Details
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Complete information about this appointment
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            </div>
+          ) : selectedAppointment ? (
+            <div className="space-y-6 mt-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-400">Current Status</span>
+                {getStatusBadge(selectedAppointment.status)}
+              </div>
+
+              {/* Visit Date */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-slate-300">Visit Date</span>
+                </div>
+                <p className="text-slate-100 pl-6">
+                  {format(new Date(selectedAppointment.visitDate), 'EEEE, MMMM dd, yyyy')}
+                </p>
+              </div>
+
+              {/* Client Information */}
+              <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium text-slate-300">Client Information</span>
+                </div>
+                <div className="space-y-2 pl-6">
+                  <div>
+                    <p className="text-xs text-slate-400">Name</p>
+                    <p className="text-slate-100">{selectedAppointment.client.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Primary Contact</p>
+                    <div className="flex items-center gap-2 text-slate-100">
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      {selectedAppointment.client.primaryContact}
+                    </div>
+                  </div>
+                  {selectedAppointment.client.secondaryContact && (
+                    <div>
+                      <p className="text-xs text-slate-400">Secondary Contact</p>
+                      <div className="flex items-center gap-2 text-slate-100">
+                        <Phone className="w-3 h-3 text-slate-400" />
+                        {selectedAppointment.client.secondaryContact}
+                      </div>
+                    </div>
+                  )}
+                  {selectedAppointment.client.address && (
+                    <div>
+                      <p className="text-xs text-slate-400">Client Address</p>
+                      <div className="flex items-start gap-2 text-slate-100">
+                        <MapPin className="w-3 h-3 text-slate-400 mt-1 flex-shrink-0" />
+                        <span>{selectedAppointment.client.address}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Engineer Information */}
+              <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-purple-400" />
+                  <span className="text-sm font-medium text-slate-300">Engineer Information</span>
+                </div>
+                <div className="space-y-2 pl-6">
+                  <div>
+                    <p className="text-xs text-slate-400">Name</p>
+                    <p className="text-slate-100">{selectedAppointment.engineer.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Email</p>
+                    <div className="flex items-center gap-2 text-slate-100">
+                      <Mail className="w-3 h-3 text-slate-400" />
+                      {selectedAppointment.engineer.email}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400">Mobile Number</p>
+                    <div className="flex items-center gap-2 text-slate-100">
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      {selectedAppointment.engineer.mobileNumber}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Site Details */}
+              <div className="space-y-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-medium text-slate-300">Site Details</span>
+                </div>
+                <div className="space-y-2 pl-6">
+                  {selectedAppointment.siteAddress ? (
+                    <div>
+                      <p className="text-xs text-slate-400">Site Address</p>
+                      <p className="text-slate-100">{selectedAppointment.siteAddress}</p>
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 text-sm">No site address specified</p>
+                  )}
+                  {selectedAppointment.googleMapsLink && (
+                    <div>
+                      <p className="text-xs text-slate-400">Google Maps Link</p>
+                      <a
+                        href={selectedAppointment.googleMapsLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:underline"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Open in Maps
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Purpose */}
+              {selectedAppointment.purpose && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm font-medium text-slate-300">Purpose</span>
+                  </div>
+                  <p className="text-slate-100 pl-6">{selectedAppointment.purpose}</p>
+                </div>
+              )}
+
+              {/* OTP Details */}
+              {selectedAppointment.otpMobileNumber && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-blue-400" />
+                    <span className="text-sm font-medium text-slate-300">OTP Mobile Number</span>
+                  </div>
+                  <p className="text-slate-100 pl-6">{selectedAppointment.otpMobileNumber}</p>
+                </div>
+              )}
+
+              {/* OTP Sent Information */}
+              {selectedAppointment.otpSentAt && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm font-medium text-slate-300">OTP Sent At</span>
+                  </div>
+                  <p className="text-slate-100 pl-6">
+                    {format(new Date(selectedAppointment.otpSentAt), 'MMM dd, yyyy hh:mm a')}
+                  </p>
+                </div>
+              )}
+
+              {/* Verification Information */}
+              {selectedAppointment.verifiedAt && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span className="text-sm font-medium text-slate-300">Verified At</span>
+                  </div>
+                  <p className="text-slate-100 pl-6">
+                    {format(new Date(selectedAppointment.verifiedAt), 'MMM dd, yyyy hh:mm a')}
+                  </p>
+                </div>
+              )}
+
+              {/* Feedback */}
+              {selectedAppointment.feedback && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm font-medium text-slate-300">Feedback</span>
+                  </div>
+                  <div className="pl-6 p-3 bg-slate-800 rounded border border-slate-700">
+                    <p className="text-slate-100">{selectedAppointment.feedback}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="pt-4 border-t border-slate-700 space-y-2 text-xs text-slate-400">
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span>{format(new Date(selectedAppointment.createdAt), 'MMM dd, yyyy hh:mm a')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last Updated:</span>
+                  <span>{format(new Date(selectedAppointment.updatedAt), 'MMM dd, yyyy hh:mm a')}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Close Button */}
+          <div className="flex justify-end mt-6 pt-4 border-t border-slate-700">
+            <Button
+              onClick={handleCloseDetailDialog}
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+            >
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
