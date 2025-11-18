@@ -61,6 +61,10 @@ export default function AppointmentsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // Detail View Dialog
+  const [isDetailViewOpen, setIsDetailViewOpen] = useState(false);
+  const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
+
   // OTP Dialog
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -233,6 +237,11 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleViewDetails = (appointment: Appointment) => {
+    setViewingAppointment(appointment);
+    setIsDetailViewOpen(true);
+  };
+
   const getStatusBadge = (status: AppointmentStatus) => {
     const statusConfig = {
       SCHEDULED: {
@@ -362,7 +371,8 @@ export default function AppointmentsPage() {
                     {appointments.map((appointment) => (
                       <TableRow
                         key={appointment.id}
-                        className="border-slate-800 hover:bg-slate-800/30"
+                        className="border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                        onClick={() => handleViewDetails(appointment)}
                       >
                         <TableCell>
                           <div className="flex items-center text-slate-300 text-sm">
@@ -400,7 +410,7 @@ export default function AppointmentsPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(appointment.status)}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                             {/* Admin Actions */}
                             {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
                               <Button
@@ -518,6 +528,16 @@ export default function AppointmentsPage() {
 
                       {/* Actions */}
                       <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
+                        {/* View Details Button */}
+                        <Button
+                          size="sm"
+                          onClick={() => handleViewDetails(appointment)}
+                          className="flex-1 bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600"
+                        >
+                          <FileText className="h-3 w-3 mr-1" />
+                          View Details
+                        </Button>
+
                         {/* Admin Actions */}
                         {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
                           <Button
@@ -945,6 +965,199 @@ export default function AppointmentsPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Detail View Dialog */}
+      <Dialog open={isDetailViewOpen} onOpenChange={setIsDetailViewOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Appointment Details</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Complete information about this appointment
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingAppointment && (
+            <div className="space-y-6 mt-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <span className="text-sm text-slate-400">Status</span>
+                {getStatusBadge(viewingAppointment.status)}
+              </div>
+
+              {/* Client Information */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                  <Building2 className="w-4 h-4 mr-2 text-blue-400" />
+                  Client Information
+                </h3>
+                <div className="pl-6 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-400">Name:</span>
+                    <span className="text-sm text-slate-200 font-medium">{viewingAppointment.client.name}</span>
+                  </div>
+                  {viewingAppointment.client.primaryContact && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-400">Contact:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.client.primaryContact}</span>
+                    </div>
+                  )}
+                  {viewingAppointment.client.address && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-slate-400">Address:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.client.address}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Engineer Information */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                  <User className="w-4 h-4 mr-2 text-purple-400" />
+                  Engineer Information
+                </h3>
+                <div className="pl-6 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-400">Name:</span>
+                    <span className="text-sm text-slate-200 font-medium">{viewingAppointment.engineer.name}</span>
+                  </div>
+                  {viewingAppointment.engineer.email && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-400">Email:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.engineer.email}</span>
+                    </div>
+                  )}
+                  {viewingAppointment.engineer.mobileNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-400">Mobile:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.engineer.mobileNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Visit Details */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                  <CalendarIcon className="w-4 h-4 mr-2 text-blue-400" />
+                  Visit Details
+                </h3>
+                <div className="pl-6 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-400">Visit Date & Time:</span>
+                    <span className="text-sm text-slate-200 font-medium">
+                      {format(new Date(viewingAppointment.visitDate), 'MMM dd, yyyy hh:mm a')}
+                    </span>
+                  </div>
+                  {viewingAppointment.siteAddress && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-slate-400">Site Address:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.siteAddress}</span>
+                    </div>
+                  )}
+                  {viewingAppointment.googleMapsLink && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-slate-400">Google Maps:</span>
+                      <a
+                        href={viewingAppointment.googleMapsLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 underline"
+                      >
+                        Open in Maps
+                      </a>
+                    </div>
+                  )}
+                  {viewingAppointment.purpose && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-slate-400">Purpose:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.purpose}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* OTP Information */}
+              {viewingAppointment.otpMobileNumber && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                    <Send className="w-4 h-4 mr-2 text-amber-400" />
+                    OTP Information
+                  </h3>
+                  <div className="pl-6 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-slate-400">Mobile Number:</span>
+                      <span className="text-sm text-slate-200">{viewingAppointment.otpMobileNumber}</span>
+                    </div>
+                    {viewingAppointment.otpSentAt && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-400">OTP Sent At:</span>
+                        <span className="text-sm text-slate-200">
+                          {format(new Date(viewingAppointment.otpSentAt), 'MMM dd, yyyy hh:mm a')}
+                        </span>
+                      </div>
+                    )}
+                    {viewingAppointment.verifiedAt && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-slate-400">Verified At:</span>
+                        <span className="text-sm text-green-400">
+                          {format(new Date(viewingAppointment.verifiedAt), 'MMM dd, yyyy hh:mm a')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Feedback */}
+              {viewingAppointment.feedback && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                    <MessageSquare className="w-4 h-4 mr-2 text-green-400" />
+                    Feedback / Notes
+                  </h3>
+                  <div className="pl-6">
+                    <p className="text-sm text-slate-200 bg-slate-800/50 p-3 rounded-lg">
+                      {viewingAppointment.feedback}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="space-y-3 pt-4 border-t border-slate-800">
+                <h3 className="text-sm font-semibold text-slate-300 flex items-center">
+                  <Clock className="w-4 h-4 mr-2 text-slate-400" />
+                  Timestamps
+                </h3>
+                <div className="pl-6 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Created:</span>
+                    <span className="text-xs text-slate-400">
+                      {format(new Date(viewingAppointment.createdAt), 'MMM dd, yyyy hh:mm a')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-500">Last Updated:</span>
+                    <span className="text-xs text-slate-400">
+                      {format(new Date(viewingAppointment.updatedAt), 'MMM dd, yyyy hh:mm a')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end mt-6 pt-4 border-t border-slate-800">
+            <Button
+              onClick={() => setIsDetailViewOpen(false)}
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+            >
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
