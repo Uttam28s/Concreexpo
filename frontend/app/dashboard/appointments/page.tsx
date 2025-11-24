@@ -390,7 +390,8 @@ export default function AppointmentsPage() {
                     {appointments.map((appointment) => (
                       <TableRow
                         key={appointment.id}
-                        className="border-slate-800 hover:bg-slate-800/30"
+                        className="border-slate-800 hover:bg-slate-800/30 cursor-pointer"
+                        onClick={() => handleViewDetails(appointment.id)}
                       >
                         <TableCell>
                           <div className="flex items-center text-slate-300 text-sm">
