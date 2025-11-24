@@ -159,7 +159,7 @@ export default function LoginPage() {
                 <span className="text-blue-400">Admin:</span> admin@example.com / Admin@123456
               </p>
               <p className="text-slate-500">
-                <span className="text-purple-400">Engineer:</span> engineer@example.com / Engineer@123
+                <span className="text-purple-400">Engineer:</span> kalpesh.dave@wallfloor.com / Engineer@123
               </p>
             </div>
           </div>
