@@ -45,6 +45,7 @@ import {
   Clock,
   Send,
   AlertCircle,
+  RotateCw,
 } from 'lucide-react';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
 
@@ -84,6 +85,8 @@ export default function WorkerCountsPage() {
     remarks: '',
   });
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [resendOtpLoading, setResendOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
@@ -266,6 +269,66 @@ export default function WorkerCountsPage() {
     }
   };
 
+  const handleResendOtp = async (visitId: string) => {
+    try {
+      setResendOtpLoading(true);
+      const response = await workerVisitApi.resendOtp(visitId);
+      toast.success('OTP resent successfully');
+      
+      // Set cooldown timer (60 seconds)
+      setResendCooldown(60);
+      const cooldownInterval = setInterval(() => {
+        setResendCooldown((prev: number) => {
+          if (prev <= 1) {
+            clearInterval(cooldownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Refresh visits
+      if (user?.role === 'ENGINEER') {
+        fetchPendingVisits();
+      } else {
+        fetchVisits();
+      }
+      
+      // If dialog is open, refresh the selected visit
+      if (isSubmitDialogOpen && selectedVisit?.id === visitId) {
+        // Refresh pending visits to get updated visit
+        if (user?.role === 'ENGINEER') {
+          const updatedVisits = await workerVisitApi.getPending();
+          const updatedVisit = updatedVisits.data.data.find((v: WorkerVisit) => v.id === visitId);
+          if (updatedVisit) {
+            setSelectedVisit(updatedVisit);
+          }
+        }
+      }
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        const retryAfter = error.response?.data?.retryAfter || 60;
+        setResendCooldown(retryAfter);
+        toast.error(error.response?.data?.error || `Please wait ${retryAfter} seconds before resending`);
+        
+        // Start cooldown timer
+        const cooldownInterval = setInterval(() => {
+          setResendCooldown((prev: number) => {
+            if (prev <= 1) {
+              clearInterval(cooldownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to resend OTP');
+      }
+    } finally {
+      setResendOtpLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { className: string; label: string; icon: any }> = {
       PENDING: {
@@ -434,12 +497,57 @@ export default function WorkerCountsPage() {
                     )}
 
                     {isExpired && visit.status === 'PENDING' && (
-                      <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-center">
-                        <AlertCircle className="w-5 h-5 text-red-400 mx-auto mb-2" />
-                        <p className="text-sm text-red-400">
-                          OTP expired. Contact admin for a new visit.
-                        </p>
+                      <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg space-y-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <AlertCircle className="w-5 h-5 text-red-400" />
+                          <p className="text-sm text-red-400">
+                            OTP expired.
+                          </p>
+                        </div>
+                        {user?.role === 'ENGINEER' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleResendOtp(visit.id)}
+                            disabled={resendOtpLoading}
+                            className="w-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
+                          >
+                            {resendOtpLoading ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Resending...
+                              </>
+                            ) : (
+                              <>
+                                <RotateCw className="h-3 w-3 mr-1" />
+                                Resend OTP
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
+                    )}
+                    
+                    {!isExpired && visit.status === 'PENDING' && user?.role === 'ENGINEER' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleResendOtp(visit.id)}
+                        disabled={resendOtpLoading}
+                        className="w-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
+                      >
+                        {resendOtpLoading ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Resending...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCw className="h-3 w-3 mr-1" />
+                            Resend OTP
+                          </>
+                        )}
+                      </Button>
                     )}
                   </CardContent>
                 </Card>

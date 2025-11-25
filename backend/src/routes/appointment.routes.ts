@@ -7,6 +7,7 @@ import {
   cancelAppointment,
   getEngineerDashboard,
   sendOTP,
+  resendOTP,
   verifyOTP,
   submitFeedback,
   getReports,
@@ -28,6 +29,7 @@ router.delete('/:id', adminOnly, cancelAppointment);
 // Engineer routes
 router.get('/dashboard', engineerOnly, getEngineerDashboard);
 router.post('/:id/send-otp', engineerOnly, sendOTP);
+router.post('/:id/resend-otp', engineerOnly, resendOTP);
 router.post('/:id/verify-otp', engineerOnly, verifyOTP);
 router.post('/:id/feedback', engineerOnly, submitFeedback);
 

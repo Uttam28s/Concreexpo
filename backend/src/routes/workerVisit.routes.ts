@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createVisit,
+  resendOTP,
   submitWorkerCount,
   getPendingVisits,
   getCompletedVisits,
@@ -18,6 +19,7 @@ router.use(authenticate);
 
 // Engineer routes
 router.post('/', engineerOnly, createVisit);
+router.post('/:id/resend-otp', engineerOnly, resendOTP);
 router.post('/:id/submit-count', engineerOnly, submitWorkerCount);
 router.get('/pending', engineerOnly, getPendingVisits);
 

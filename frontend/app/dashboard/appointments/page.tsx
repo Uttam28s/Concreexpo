@@ -50,6 +50,7 @@ import {
   Phone,
   Mail,
   ExternalLink,
+  RotateCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -75,6 +76,8 @@ export default function AppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [otp, setOtp] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
+  const [resendOtpLoading, setResendOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Feedback Dialog
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
@@ -191,6 +194,56 @@ export default function AppointmentsPage() {
       fetchAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send OTP');
+    }
+  };
+
+  const handleResendOtp = async (appointmentId: string) => {
+    try {
+      setResendOtpLoading(true);
+      const response = await appointmentApi.resendOtp(appointmentId);
+      toast.success('OTP resent successfully');
+      
+      // Set cooldown timer (60 seconds)
+      setResendCooldown(60);
+      const cooldownInterval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            clearInterval(cooldownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Refresh appointments to get updated OTP sent time
+      fetchAppointments();
+      
+      // If dialog is open, refresh the selected appointment
+      if (isOtpDialogOpen && selectedAppointment?.id === appointmentId) {
+        const updatedAppointment = await appointmentApi.getById(appointmentId);
+        setSelectedAppointment(updatedAppointment.data);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        const retryAfter = error.response?.data?.retryAfter || 60;
+        setResendCooldown(retryAfter);
+        toast.error(error.response?.data?.error || `Please wait ${retryAfter} seconds before resending`);
+        
+        // Start cooldown timer
+        const cooldownInterval = setInterval(() => {
+          setResendCooldown((prev) => {
+            if (prev <= 1) {
+              clearInterval(cooldownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to resend OTP');
+      }
+    } finally {
+      setResendOtpLoading(false);
     }
   };
 
@@ -569,15 +622,35 @@ export default function AppointmentsPage() {
                         </Button>
 
                         {/* Admin Actions */}
-                        {user?.role === 'ADMIN' && appointment.status === 'SCHEDULED' && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleSendOtp(appointment.id)}
-                            className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
-                          >
-                            <Send className="h-3 w-3 mr-1" />
-                            Send OTP
-                          </Button>
+                        {user?.role === 'ADMIN' && (
+                          <>
+                            {appointment.status === 'SCHEDULED' && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendOtp(appointment.id)}
+                                className="flex-1 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/30"
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Send OTP
+                              </Button>
+                            )}
+                            {appointment.status === 'OTP_SENT' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResendOtp(appointment.id)}
+                                disabled={resendOtpLoading}
+                                className="flex-1 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
+                              >
+                                {resendOtpLoading ? (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                ) : (
+                                  <RotateCw className="h-3 w-3 mr-1" />
+                                )}
+                                Resend OTP
+                              </Button>
+                            )}
+                          </>
                         )}
 
                         {/* Engineer Actions */}
@@ -595,14 +668,30 @@ export default function AppointmentsPage() {
                             )}
 
                             {appointment.status === 'OTP_SENT' && (
-                              <Button
-                                size="sm"
-                                onClick={() => handleOpenOtpDialog(appointment)}
-                                className="flex-1 gradient-primary text-white"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Verify OTP
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleOpenOtpDialog(appointment)}
+                                  className="flex-1 gradient-primary text-white"
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Verify OTP
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleResendOtp(appointment.id)}
+                                  disabled={resendOtpLoading}
+                                  className="flex-1 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
+                                >
+                                  {resendOtpLoading ? (
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <RotateCw className="h-3 w-3 mr-1" />
+                                  )}
+                                  Resend OTP
+                                </Button>
+                              </>
                             )}
 
                             {(appointment.status === 'VERIFIED' || appointment.status === 'COMPLETED') && (
@@ -894,6 +983,35 @@ export default function AppointmentsPage() {
                 className="bg-slate-800 border-slate-700 text-slate-100 text-center text-2xl tracking-widest"
                 placeholder="000000"
               />
+              {selectedAppointment && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">
+                    Didn't receive OTP?
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleResendOtp(selectedAppointment.id)}
+                    disabled={resendOtpLoading || resendCooldown > 0}
+                    className="h-auto p-0 text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                  >
+                    {resendOtpLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Resending...
+                      </>
+                    ) : resendCooldown > 0 ? (
+                      `Resend in ${resendCooldown}s`
+                    ) : (
+                      <>
+                        <RotateCw className="h-3 w-3 mr-1" />
+                        Resend OTP
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">

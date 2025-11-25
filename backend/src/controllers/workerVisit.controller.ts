@@ -131,6 +131,133 @@ export const createVisit = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
+ * Resend OTP for worker visit (Engineer only)
+ */
+export const resendOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    const visit = await prisma.workerVisit.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        engineer: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!visit) {
+      res.status(404).json({ error: 'Visit not found' });
+      return;
+    }
+
+    // Verify engineer owns this visit
+    if (visit.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check if already completed
+    if (visit.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Worker count already submitted for this visit' });
+      return;
+    }
+
+    // Rate limiting: Check if OTP was sent recently (within last 60 seconds)
+    if (visit.otpSentAt) {
+      const timeSinceLastOTP = Date.now() - new Date(visit.otpSentAt).getTime();
+      const cooldownPeriod = 60 * 1000; // 60 seconds
+
+      if (timeSinceLastOTP < cooldownPeriod) {
+        const remainingSeconds = Math.ceil((cooldownPeriod - timeSinceLastOTP) / 1000);
+        res.status(429).json({ 
+          error: `Please wait ${remainingSeconds} seconds before requesting a new OTP`,
+          retryAfter: remainingSeconds
+        });
+        return;
+      }
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+    const otpExpiry = getWorkerVisitOTPExpiry();
+
+    // Get admin phone from settings
+    const adminPhoneSetting = await prisma.settings.findUnique({
+      where: { key: 'admin_phone' },
+    });
+
+    const adminPhone = adminPhoneSetting?.value || process.env.ADMIN_PHONE || '';
+
+    // Format date for SMS
+    const dateStr = format(new Date(visit.visitDate), 'MMM dd, yyyy');
+
+    // Send OTP to client's primary contact
+    const clientOtpSent = await sendWorkerCountOTPToClient(
+      visit.client.primaryContact,
+      otp,
+      visit.client.name,
+      dateStr
+    );
+
+    // Send OTP to admin
+    let adminOtpSent = false;
+    if (adminPhone) {
+      adminOtpSent = await sendWorkerCountOTPToAdmin(
+        adminPhone,
+        otp,
+        visit.engineer.name,
+        visit.client.name,
+        dateStr
+      );
+    }
+
+    // Only update if at least client OTP was sent
+    if (!clientOtpSent) {
+      console.error(`Failed to resend OTP to client ${visit.client.primaryContact} for visit ${id}`);
+      res.status(500).json({ 
+        error: 'Failed to resend OTP. Please check the phone number and SMS configuration.',
+        sentTo: {
+          client: visit.client.primaryContact,
+          admin: adminPhone || 'Not configured',
+        }
+      });
+      return;
+    }
+
+    // Update visit with new OTP
+    await prisma.workerVisit.update({
+      where: { id },
+      data: {
+        otp,
+        otpExpiresAt: otpExpiry,
+        otpSentAt: new Date(),
+        status: 'PENDING',
+      },
+    });
+
+    res.json({
+      message: 'OTP resent successfully',
+      sentTo: {
+        client: visit.client.primaryContact,
+        admin: adminPhone || 'Not configured',
+      },
+      clientOtpSent,
+      adminOtpSent: adminPhone ? adminOtpSent : null,
+      expiresAt: otpExpiry,
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({ error: 'Failed to resend OTP' });
+  }
+};
+
+/**
  * Submit worker count with OTP verification (Engineer only)
  */
 export const submitWorkerCount = async (req: Request, res: Response): Promise<void> => {

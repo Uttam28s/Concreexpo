@@ -30,6 +30,7 @@ import {
   Phone,
   MessageSquare,
   Navigation,
+  RotateCw,
 } from 'lucide-react';
 import { format, isPast, isFuture, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -46,6 +47,8 @@ export default function EngineerDashboardPage() {
   const [feedback, setFeedback] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [resendOtpLoading, setResendOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Redirect if not engineer
   useEffect(() => {
@@ -80,6 +83,55 @@ export default function EngineerDashboardPage() {
       fetchAppointments();
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to send OTP');
+    }
+  };
+
+  const handleResendOtp = async (appointmentId: string) => {
+    try {
+      setResendOtpLoading(true);
+      const response = await appointmentApi.resendOtp(appointmentId);
+      toast.success('OTP resent successfully');
+      
+      // Set cooldown timer (60 seconds)
+      setResendCooldown(60);
+      const cooldownInterval = setInterval(() => {
+        setResendCooldown((prev: number) => {
+          if (prev <= 1) {
+            clearInterval(cooldownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      fetchAppointments();
+      
+      // If dialog is open, refresh the selected appointment
+      if (isOtpDialogOpen && selectedAppointment?.id === appointmentId) {
+        const updatedAppointment = await appointmentApi.getById(appointmentId);
+        setSelectedAppointment(updatedAppointment.data);
+      }
+    } catch (error: any) {
+      if (error.response?.status === 429) {
+        const retryAfter = error.response?.data?.retryAfter || 60;
+        setResendCooldown(retryAfter);
+        toast.error(error.response?.data?.error || `Please wait ${retryAfter} seconds before resending`);
+        
+        // Start cooldown timer
+        const cooldownInterval = setInterval(() => {
+          setResendCooldown((prev: number) => {
+            if (prev <= 1) {
+              clearInterval(cooldownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to resend OTP');
+      }
+    } finally {
+      setResendOtpLoading(false);
     }
   };
 
@@ -322,13 +374,33 @@ export default function EngineerDashboardPage() {
                   )}
 
                   {appointment.status === 'OTP_SENT' && (
-                    <Button
-                      onClick={() => handleOpenOtpDialog(appointment)}
-                      className="w-full gradient-primary text-white"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Verify OTP
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => handleOpenOtpDialog(appointment)}
+                        className="w-full gradient-primary text-white"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Verify OTP
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleResendOtp(appointment.id)}
+                        disabled={resendOtpLoading}
+                        className="w-full bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
+                      >
+                        {resendOtpLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Resending...
+                          </>
+                        ) : (
+                          <>
+                            <RotateCw className="w-4 h-4 mr-2" />
+                            Resend OTP
+                          </>
+                        )}
+                      </Button>
+                    </>
                   )}
 
                   {appointment.status === 'VERIFIED' && (
@@ -380,9 +452,35 @@ export default function EngineerDashboardPage() {
                 placeholder="000000"
                 autoComplete="off"
               />
-              <p className="text-xs text-slate-500">
-                Attempts remaining: {selectedAppointment ? 3 - selectedAppointment.otpAttempts : 3}
-              </p>
+              <div className="flex items-center justify-between text-xs">
+                <p className="text-slate-500">
+                  Attempts remaining: {selectedAppointment ? 3 - selectedAppointment.otpAttempts : 3}
+                </p>
+                {selectedAppointment && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleResendOtp(selectedAppointment.id)}
+                    disabled={resendOtpLoading || resendCooldown > 0}
+                    className="h-auto p-0 text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                  >
+                    {resendOtpLoading ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Resending...
+                      </>
+                    ) : resendCooldown > 0 ? (
+                      `Resend in ${resendCooldown}s`
+                    ) : (
+                      <>
+                        <RotateCw className="h-3 w-3 mr-1" />
+                        Resend OTP
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">

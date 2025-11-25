@@ -408,8 +408,24 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
     // Determine recipient: otpMobileNumber if provided, else client's primary contact
     const recipientPhone = appointment.otpMobileNumber || appointment.client.primaryContact;
 
+    // Validate phone number
+    if (!recipientPhone || recipientPhone.trim() === '') {
+      res.status(400).json({ error: 'Client phone number is missing' });
+      return;
+    }
+
     // Send OTP SMS
-    await sendVisitOTP(recipientPhone, otp, appointment.engineer.name);
+    const otpSent = await sendVisitOTP(recipientPhone, otp, appointment.engineer.name);
+
+    // Only update appointment if SMS was sent successfully
+    if (!otpSent) {
+      console.error(`Failed to send OTP to ${recipientPhone} for appointment ${id}`);
+      res.status(500).json({ 
+        error: 'Failed to send OTP. Please check the phone number and SMS configuration.',
+        sentTo: recipientPhone
+      });
+      return;
+    }
 
     // Update appointment
     await prisma.appointment.update({
@@ -431,6 +447,130 @@ export const sendOTP = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Send OTP error:', error);
     res.status(500).json({ error: 'Failed to send OTP' });
+  }
+};
+
+/**
+ * Resend OTP for appointment verification (Engineer only)
+ */
+export const resendOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        engineer: true,
+        client: true,
+      },
+    });
+
+    if (!appointment) {
+      res.status(404).json({ error: 'Appointment not found' });
+      return;
+    }
+
+    // Verify engineer owns this appointment
+    if (appointment.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check appointment status - can only resend if OTP was already sent or scheduled
+    if (appointment.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Appointment already completed' });
+      return;
+    }
+
+    // Rate limiting: Check if OTP was sent recently (within last 60 seconds)
+    if (appointment.otpSentAt) {
+      const timeSinceLastOTP = Date.now() - new Date(appointment.otpSentAt).getTime();
+      const cooldownPeriod = 60 * 1000; // 60 seconds
+
+      if (timeSinceLastOTP < cooldownPeriod) {
+        const remainingSeconds = Math.ceil((cooldownPeriod - timeSinceLastOTP) / 1000);
+        res.status(429).json({ 
+          error: `Please wait ${remainingSeconds} seconds before requesting a new OTP`,
+          retryAfter: remainingSeconds
+        });
+        return;
+      }
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+    const otpExpiry = getOTPExpiry();
+
+    // Determine recipient: otpMobileNumber if provided, else client's primary contact
+    const recipientPhone = appointment.otpMobileNumber || appointment.client.primaryContact;
+
+    // Validate phone number
+    if (!recipientPhone || recipientPhone.trim() === '') {
+      res.status(400).json({ error: 'Client phone number is missing' });
+      return;
+    }
+
+    // Send OTP SMS
+    console.log(`Resending OTP to ${recipientPhone} for appointment ${id}`);
+    const otpSent = await sendVisitOTP(recipientPhone, otp, appointment.engineer.name);
+
+    // Only update appointment if SMS was sent successfully
+    if (!otpSent) {
+      console.error(`Failed to resend OTP to ${recipientPhone} for appointment ${id}. Check SMS logs for details.`);
+      
+      // Check SMS logs for recent failures to provide better error message
+      let errorDetails = 'SMS service unavailable';
+      try {
+        const recentLogs = await prisma.sMSLog.findMany({
+          where: {
+            phone: {
+              contains: recipientPhone.replace(/\D/g, '').slice(-10), // Last 10 digits
+            },
+            status: 'failed',
+          },
+          orderBy: {
+            id: 'desc',
+          },
+          take: 1,
+        });
+        
+        if (recentLogs.length > 0) {
+          errorDetails = recentLogs[0].error || 'SMS service unavailable';
+        }
+      } catch (logError) {
+        console.error('Failed to fetch SMS logs:', logError);
+      }
+      
+      res.status(500).json({ 
+        error: 'Failed to resend OTP. Please check the phone number and SMS configuration.',
+        details: errorDetails,
+        sentTo: recipientPhone,
+        suggestion: 'Please verify MSG91 configuration and phone number format.'
+      });
+      return;
+    }
+
+    // Update appointment with new OTP
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        otp,
+        otpExpiresAt: otpExpiry,
+        otpSentAt: new Date(),
+        otpAttempts: 0, // Reset attempts on resend
+        status: 'OTP_SENT',
+      },
+    });
+
+    res.json({
+      message: 'OTP resent successfully',
+      sentTo: recipientPhone,
+      expiresAt: otpExpiry,
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({ error: 'Failed to resend OTP' });
   }
 };
 
