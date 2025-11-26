@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
+import { featureFlags } from '@/lib/featureFlags';
 import {
   LayoutDashboard,
   Calendar,
@@ -27,6 +28,7 @@ interface NavItem {
   href: string;
   icon: any;
   roles?: ('ADMIN' | 'ENGINEER')[];
+  featureFlag?: () => boolean;
 }
 
 const mainNavItems: NavItem[] = [
@@ -34,27 +36,32 @@ const mainNavItems: NavItem[] = [
     title: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+    featureFlag: featureFlags.dashboard,
   },
   {
     title: 'Appointments',
     href: '/dashboard/appointments',
     icon: Calendar,
+    featureFlag: featureFlags.appointments,
   },
   {
     title: 'Inventory',
     href: '/dashboard/inventory',
     icon: Package,
+    featureFlag: featureFlags.inventory,
   },
   {
     title: 'Worker Counts',
     href: '/dashboard/worker-counts',
     icon: Users,
+    featureFlag: featureFlags.workerCounts,
   },
   {
     title: 'Reports',
     href: '/dashboard/reports',
     icon: BarChart3,
     roles: ['ADMIN'],
+    featureFlag: featureFlags.reports,
   },
 ];
 
@@ -64,18 +71,21 @@ const masterNavItems: NavItem[] = [
     href: '/dashboard/clients',
     icon: Building2,
     roles: ['ADMIN'],
+    featureFlag: featureFlags.clients,
   },
   {
     title: 'Engineers',
     href: '/dashboard/engineers',
     icon: Wrench,
     roles: ['ADMIN'],
+    featureFlag: featureFlags.engineers,
   },
   {
     title: 'Materials',
     href: '/dashboard/materials',
     icon: Boxes,
     roles: ['ADMIN'],
+    featureFlag: featureFlags.materials,
   },
 ];
 
@@ -86,6 +96,11 @@ export function Sidebar() {
 
   const filterByRole = (items: NavItem[]) => {
     return items.filter((item) => {
+      // Check feature flag first
+      if (item.featureFlag && !item.featureFlag()) {
+        return false;
+      }
+      // Then check role permissions
       if (!item.roles) return true;
       return item.roles.includes(user?.role as any);
     });
@@ -237,15 +252,17 @@ export function Sidebar() {
         </nav>
 
         {/* Settings at Bottom */}
-        <div className="px-3 py-4 border-t border-slate-800">
-          <Link
-            href="/dashboard/settings"
-            className="flex items-center px-3 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all duration-200"
-          >
-            <Settings className={cn('flex-shrink-0', sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5')} />
-            {!sidebarCollapsed && <span className="ml-3 font-medium">Settings</span>}
-          </Link>
-        </div>
+        {featureFlags.settings() && (
+          <div className="px-3 py-4 border-t border-slate-800">
+            <Link
+              href="/dashboard/settings"
+              className="flex items-center px-3 py-3 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all duration-200"
+            >
+              <Settings className={cn('flex-shrink-0', sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5')} />
+              {!sidebarCollapsed && <span className="ml-3 font-medium">Settings</span>}
+            </Link>
+          </div>
+        )}
 
         {/* Collapse Toggle */}
         <div className="px-3 pb-4">
