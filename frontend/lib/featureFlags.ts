@@ -1,5 +1,4 @@
 function isFeatureEnabled(value: string | undefined): boolean {
-  console.log('value', value);
   if (value === undefined || value === '') {
     return true;
   }
@@ -21,7 +20,7 @@ export const featureFlags = {
   
   settings: () => isFeatureEnabled(process.env.NEXT_PUBLIC_FEATURE_SETTINGS),
 } as const;
-
+ 
 export const FEATURE_FLAGS = {
   DASHBOARD: 'NEXT_PUBLIC_FEATURE_DASHBOARD',
   APPOINTMENTS: 'NEXT_PUBLIC_FEATURE_APPOINTMENTS',
