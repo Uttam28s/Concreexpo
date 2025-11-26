@@ -9,6 +9,8 @@ import {
   sendOTP,
   resendOTP,
   verifyOTP,
+  generateOTPWidgetToken,
+  verifyOTPWithWidget,
   submitFeedback,
   getReports,
 } from '../controllers/appointment.controller';
@@ -31,6 +33,8 @@ router.get('/dashboard', engineerOnly, getEngineerDashboard);
 router.post('/:id/send-otp', engineerOnly, sendOTP);
 router.post('/:id/resend-otp', engineerOnly, resendOTP);
 router.post('/:id/verify-otp', engineerOnly, verifyOTP);
+router.get('/:id/otp-widget-token', engineerOnly, generateOTPWidgetToken);
+router.post('/:id/verify-otp-widget', engineerOnly, verifyOTPWithWidget);
 router.post('/:id/feedback', engineerOnly, submitFeedback);
 
 // Shared routes

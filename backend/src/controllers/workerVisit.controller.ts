@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 import { generateOTP, getWorkerVisitOTPExpiry, isOTPExpired } from '../utils/otp';
-import { sendWorkerCountOTPToClient, sendWorkerCountOTPToAdmin } from '../services/sms.service';
+import { sendWorkerCountOTPToClient, sendWorkerCountOTPToAdmin, normalizePhoneNumber } from '../services/sms.service';
 import { format } from 'date-fns';
+import { generateMSG91OTPToken, verifyMSG91OTPToken } from '../utils/jwt';
+import axios from 'axios';
+import { config } from '../config/env';
 
 /**
  * Create worker visit and send dual OTP (Admin and Engineer)
@@ -254,6 +257,193 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Resend OTP error:', error);
     res.status(500).json({ error: 'Failed to resend OTP' });
+  }
+};
+
+/**
+ * Generate MSG91 OTP Widget token for worker visit verification
+ */
+export const generateOTPWidgetToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    const visit = await prisma.workerVisit.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        engineer: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!visit) {
+      res.status(404).json({ error: 'Visit not found' });
+      return;
+    }
+
+    // Verify engineer owns this visit
+    if (visit.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check if already completed
+    if (visit.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Worker count already submitted for this visit' });
+      return;
+    }
+
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(visit.client.primaryContact);
+    if (!normalizedPhone) {
+      res.status(400).json({ error: 'Invalid client phone number format' });
+      return;
+    }
+
+    // Generate JWT token for MSG91 OTP widget
+    const widgetToken = generateMSG91OTPToken({
+      phone: normalizedPhone,
+      visitId: visit.id,
+      purpose: 'worker_visit',
+      expiresIn: 24 * 60 * 60, // 24 hours
+    });
+
+    res.json({
+      token: widgetToken,
+      phone: normalizedPhone,
+      expiresIn: 24 * 60 * 60, // seconds
+    });
+  } catch (error) {
+    console.error('Generate OTP widget token error:', error);
+    res.status(500).json({ error: 'Failed to generate OTP widget token' });
+  }
+};
+
+/**
+ * Submit worker count with OTP verification using MSG91 widget (Engineer only)
+ */
+export const submitWorkerCountWithWidget = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { accessToken, workerCount, remarks } = req.body; // accessToken from MSG91 widget
+    const userId = req.user?.userId;
+
+    if (!accessToken || !workerCount) {
+      res.status(400).json({ error: 'Access token and worker count are required' });
+      return;
+    }
+
+    if (workerCount <= 0) {
+      res.status(400).json({ error: 'Worker count must be positive' });
+      return;
+    }
+
+    // Verify the MSG91 widget token
+    const tokenPayload = verifyMSG91OTPToken(accessToken);
+    if (!tokenPayload || tokenPayload.visitId !== id) {
+      res.status(400).json({ error: 'Invalid or expired access token' });
+      return;
+    }
+
+    // Verify with MSG91 API
+    const verifyResponse = await axios.post(
+      'https://control.msg91.com/api/v5/widget/verifyAccessToken',
+      {
+        authkey: config.sms.msg91.authKey,
+        'access-token': accessToken,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    if (verifyResponse.data.type !== 'success') {
+      res.status(400).json({ 
+        error: 'OTP verification failed',
+        details: verifyResponse.data.message || 'Invalid OTP'
+      });
+      return;
+    }
+
+    // Get visit
+    const visit = await prisma.workerVisit.findUnique({
+      where: { id },
+      include: {
+        client: {
+          select: {
+            name: true,
+          },
+        },
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!visit) {
+      res.status(404).json({ error: 'Visit not found' });
+      return;
+    }
+
+    // Verify engineer owns this visit
+    if (visit.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check if already completed
+    if (visit.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Worker count already submitted for this visit' });
+      return;
+    }
+
+    // Update visit with worker count
+    const updatedVisit = await prisma.workerVisit.update({
+      where: { id },
+      data: {
+        workerCount: Number(workerCount),
+        remarks,
+        status: 'OTP_VERIFIED',
+        verifiedAt: new Date(),
+      },
+      include: {
+        client: {
+          select: {
+            name: true,
+          },
+        },
+        engineer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      message: 'Worker count submitted successfully',
+      visit: updatedVisit,
+    });
+  } catch (error: any) {
+    console.error('Submit worker count with widget error:', error);
+    if (error.response?.data) {
+      res.status(400).json({ 
+        error: 'OTP verification failed',
+        details: error.response.data.message || 'Invalid OTP'
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to submit worker count' });
+    }
   }
 };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -73,13 +74,20 @@ export default function LoginPage() {
       <Card className="w-full max-w-md relative z-10 bg-slate-800/80 backdrop-blur-xl border-slate-700 shadow-2xl">
         <CardHeader className="space-y-4 text-center align-center">
           {/* Logo */}
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <div className="text-3xl font-bold text-white">C</div>
+          <div className="mx-auto w-32 h-32 rounded-2xl flex items-center justify-center overflow-hidden">
+            <Image
+              src="/Concreexpo-large-icon.png"
+              alt="Concreexpo"
+              width={128}
+              height={128}
+              className="object-contain w-full h-full"
+              priority
+            />
           </div>
 
           <div>
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Concreexpo
+              CONCREEXPO
             </CardTitle>
             <CardDescription className="text-slate-400 mt-2">
               Wall & Flooring Management System

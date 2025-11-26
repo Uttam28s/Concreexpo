@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/store/uiStore';
@@ -117,19 +118,31 @@ export function Sidebar() {
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-800">
           {!sidebarCollapsed && (
             <Link href={getDashboardHref()} className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <span className="text-xl font-bold text-white">C</span>
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
+                <Image
+                  src="/Concreexpo-large-icon.png"
+                  alt="Concreexpo"
+                  width={56}
+                  height={56}
+                  className="object-contain w-full h-full"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  Concreexpo
+                  CONCREEXPO
                 </h1>
               </div>
             </Link>
           )}
           {sidebarCollapsed && (
-            <Link href={getDashboardHref()} className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto">
-              <span className="text-xl font-bold text-white">C</span>
+            <Link href={getDashboardHref()} className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto overflow-hidden flex-shrink-0">
+              <Image
+                src="/Concreexpo-large-icon.png"
+                alt="Concreexpo"
+                width={56}
+                height={56}
+                className="object-contain w-full h-full"
+              />
             </Link>
           )}
         </div>

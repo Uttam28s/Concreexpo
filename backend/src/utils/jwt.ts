@@ -46,3 +46,43 @@ export const verifyRefreshToken = (token: string): JWTPayload | null => {
     return null;
   }
 };
+
+/**
+ * Generate MSG91 OTP Widget JWT token
+ * This token is used by MSG91 OTP widget to send and verify OTP
+ */
+export interface MSG91OTPPayload {
+  phone: string;
+  appointmentId?: string;
+  visitId?: string;
+  purpose: 'appointment' | 'worker_visit';
+  expiresIn?: number; // in seconds, default 15 minutes
+}
+
+export const generateMSG91OTPToken = (payload: MSG91OTPPayload): string => {
+  const expiresIn = payload.expiresIn || 15 * 60; // 15 minutes default
+  
+  return jwt.sign(
+    {
+      phone: payload.phone,
+      appointmentId: payload.appointmentId,
+      visitId: payload.visitId,
+      purpose: payload.purpose,
+    },
+    config.jwt.secret, // Using same secret, or can use a separate one
+    {
+      expiresIn: `${expiresIn}s`,
+    } as SignOptions
+  );
+};
+
+/**
+ * Verify MSG91 OTP Widget JWT token
+ */
+export const verifyMSG91OTPToken = (token: string): MSG91OTPPayload | null => {
+  try {
+    return jwt.verify(token, config.jwt.secret) as MSG91OTPPayload;
+  } catch (error) {
+    return null;
+  }
+};

@@ -3,6 +3,8 @@ import {
   createVisit,
   resendOTP,
   submitWorkerCount,
+  generateOTPWidgetToken,
+  submitWorkerCountWithWidget,
   getPendingVisits,
   getCompletedVisits,
   getAllVisits,
@@ -21,6 +23,8 @@ router.use(authenticate);
 router.post('/', engineerOnly, createVisit);
 router.post('/:id/resend-otp', engineerOnly, resendOTP);
 router.post('/:id/submit-count', engineerOnly, submitWorkerCount);
+router.get('/:id/otp-widget-token', engineerOnly, generateOTPWidgetToken);
+router.post('/:id/submit-count-widget', engineerOnly, submitWorkerCountWithWidget);
 router.get('/pending', engineerOnly, getPendingVisits);
 
 // Shared routes (role-based access inside controller)

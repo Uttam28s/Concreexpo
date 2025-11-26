@@ -5,8 +5,12 @@ import {
   sendAppointmentNotification,
   sendAppointmentNotificationToEngineer,
   sendVisitOTP,
+  normalizePhoneNumber,
 } from '../services/sms.service';
 import { format } from 'date-fns';
+import { generateMSG91OTPToken, verifyMSG91OTPToken } from '../utils/jwt';
+import axios from 'axios';
+import { config } from '../config/env';
 
 /**
  * Get all appointments (Admin: all, Engineer: own only)
@@ -571,6 +575,158 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Resend OTP error:', error);
     res.status(500).json({ error: 'Failed to resend OTP' });
+  }
+};
+
+/**
+ * Generate MSG91 OTP Widget token for appointment verification
+ */
+export const generateOTPWidgetToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        engineer: true,
+        client: true,
+      },
+    });
+
+    if (!appointment) {
+      res.status(404).json({ error: 'Appointment not found' });
+      return;
+    }
+
+    // Verify engineer owns this appointment
+    if (appointment.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check appointment status
+    if (appointment.status === 'COMPLETED') {
+      res.status(400).json({ error: 'Appointment already completed' });
+      return;
+    }
+
+    // Determine recipient: otpMobileNumber if provided, else client's primary contact
+    const recipientPhone = appointment.otpMobileNumber || appointment.client.primaryContact;
+
+    // Validate phone number
+    if (!recipientPhone || recipientPhone.trim() === '') {
+      res.status(400).json({ error: 'Client phone number is missing' });
+      return;
+    }
+
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(recipientPhone);
+    if (!normalizedPhone) {
+      res.status(400).json({ error: 'Invalid phone number format' });
+      return;
+    }
+
+    // Generate JWT token for MSG91 OTP widget
+    const widgetToken = generateMSG91OTPToken({
+      phone: normalizedPhone,
+      appointmentId: appointment.id,
+      purpose: 'appointment',
+      expiresIn: 15 * 60, // 15 minutes
+    });
+
+    res.json({
+      token: widgetToken,
+      phone: normalizedPhone,
+      expiresIn: 15 * 60, // seconds
+    });
+  } catch (error) {
+    console.error('Generate OTP widget token error:', error);
+    res.status(500).json({ error: 'Failed to generate OTP widget token' });
+  }
+};
+
+/**
+ * Verify OTP using MSG91 widget access token
+ */
+export const verifyOTPWithWidget = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { accessToken } = req.body; // JWT token from MSG91 widget
+    const userId = req.user?.userId;
+
+    if (!accessToken) {
+      res.status(400).json({ error: 'Access token is required' });
+      return;
+    }
+
+    // Verify the MSG91 widget token
+    const tokenPayload = verifyMSG91OTPToken(accessToken);
+    if (!tokenPayload || tokenPayload.appointmentId !== id) {
+      res.status(400).json({ error: 'Invalid or expired access token' });
+      return;
+    }
+
+    // Verify with MSG91 API
+    const verifyResponse = await axios.post(
+      'https://control.msg91.com/api/v5/widget/verifyAccessToken',
+      {
+        authkey: config.sms.msg91.authKey,
+        'access-token': accessToken,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      }
+    );
+
+    if (verifyResponse.data.type !== 'success') {
+      res.status(400).json({ 
+        error: 'OTP verification failed',
+        details: verifyResponse.data.message || 'Invalid OTP'
+      });
+      return;
+    }
+
+    // Get appointment
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+    });
+
+    if (!appointment) {
+      res.status(404).json({ error: 'Appointment not found' });
+      return;
+    }
+
+    // Verify engineer owns this appointment
+    if (appointment.engineerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Update appointment status
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        status: 'VERIFIED',
+        verifiedAt: new Date(),
+        otpAttempts: 0,
+      },
+    });
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (error: any) {
+    console.error('Verify OTP with widget error:', error);
+    if (error.response?.data) {
+      res.status(400).json({ 
+        error: 'OTP verification failed',
+        details: error.response.data.message || 'Invalid OTP'
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to verify OTP' });
+    }
   }
 };
 
